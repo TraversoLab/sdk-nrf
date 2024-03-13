@@ -60,7 +60,7 @@ manifest:
     # modules which NCS imports directly.
     #
     # kernel version compatibility matrix here: https://docs.google.com/spreadsheets/d/1wzGJLRuR6urTgnDFUqKk7pEB8O6vWu6Sxziw_KROxMA/edit#gid=0
-    # we use sdk/zephyr 1.16.5, therefore kernel versions 3.4.x and 3.5.x are supported 
+    # we use sdk/zephyr 0.16.5, therefore kernel versions 3.4.x and 3.5.x are supported 
     #
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/introduction/index.html
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
