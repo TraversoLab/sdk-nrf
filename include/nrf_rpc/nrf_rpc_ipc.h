@@ -113,7 +113,7 @@ struct nrf_rpc_ipc {
 #define NRF_RPC_IPC_TRANSPORT(_name, _ipc, _ept_name)                        \
 	static struct nrf_rpc_ipc _name##_instance = {                       \
 	       .ipc = _ipc,                                                  \
-	       .endpoint.ept_cfg.name = _ept_name,                           \
+	       .endpoint = { .ept_cfg = { .name = _ept_name }}                           \
 	};                                                                   \
 									     \
 	const struct nrf_rpc_tr _name = {                                    \
