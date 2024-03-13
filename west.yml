@@ -148,7 +148,7 @@ manifest:
       repo-path: sdk-nrfxlib
       remote: traversolab
       path: nrfxlib
-      revision: v2.5.2
+      revision: v2.5-branch
     - name: trusted-firmware-m
       repo-path: sdk-trusted-firmware-m
       path: modules/tee/tf-m/trusted-firmware-m
