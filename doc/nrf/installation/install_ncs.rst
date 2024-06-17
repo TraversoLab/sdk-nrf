@@ -25,7 +25,12 @@ Update operating system
 ***********************
 
 Before you start setting up the toolchain, install available updates for your operating system.
-See :ref:`requirements` for information on the supported operating systems.
+
+.. include:: ./recommended_versions.rst
+    :start-after: os_table_start
+    :end-before: os_table_end
+
+See :ref:`supported_OS` for more information about the tier definitions.
 
 .. _installing_vsc:
 
@@ -34,7 +39,7 @@ See :ref:`requirements` for information on the supported operating systems.
 Install prerequisites
 *********************
 
-Depending on your preferred development environment, install the required tools:
+Depending on your preferred development environment, install the following required tools:
 
 .. tabs::
 
@@ -44,6 +49,7 @@ Depending on your preferred development environment, install the required tools:
         Download it from the `nRF Command Line Tools`_ page.
       * The latest version of |VSC| for your operating system from the `Visual Studio Code download page`_.
       * In |VSC|, the latest version of the `nRF Connect for VS Code Extension Pack`_.
+      * Linux users: `nrf-udev`_ module with udev rules required to access USB ports on Nordic Semiconductor devices and program the firmware.
 
    .. group-tab:: Command line
 
@@ -58,6 +64,8 @@ Depending on your preferred development environment, install the required tools:
 
         .. note::
             After downloading and installing the tools, add nrfjprog to the system :envvar:`PATH` in the environment variables.
+
+      * Linux users: `nrf-udev`_ module with udev rules required to access USB ports on Nordic Semiconductor devices and program the firmware.
 
 .. _gs_installing_toolchain:
 .. _gs_installing_tools:
@@ -312,7 +320,7 @@ Set up the command-line build environment
    This step is only required when working on command line with freestanding applications.
 
 In addition to the steps mentioned above, if you want to build and program your application from the command line, you have to set up your command-line build environment by defining the required environment variables every time you open a new command-line or terminal window.
-See :ref:`zephyr:important-build-vars` for more information about the various relevant environment variables.
+See :ref:`zephyr:env_vars_important` in the Zephyr documentation for more information about the various relevant environment variables.
 
 Define the required environment variables as follows, depending on your operating system:
 
@@ -364,7 +372,11 @@ It gives you more control over each of the required tools, but requires more fam
 
 To install the |NCS| system-wide, complete the following steps:
 
-1. Follow steps 1 and 2 in Zephyr's :ref:`zephyr:getting_started` to update your operating system and install dependencies.
+1. Follow the steps in the following sections of Zephyr's :ref:`zephyr:getting_started` to update your operating system and install dependencies:
+
+   * :ref:`zephyr:host_setup`
+   * :ref:`zephyr:install-required-tools`
+
 #. Install west.
    Expand the section below to see the commands.
 
@@ -560,7 +572,7 @@ To install the |NCS| system-wide, complete the following steps:
 
    ..
 
-#. Follow step 4 in Zephyr's :ref:`zephyr:getting_started` to install the Zephyr SDK.
+#. Follow the steps in the "Install the Zephyr SDK" section in Zephyr's :ref:`zephyr:getting_started` to install the Zephyr SDK.
 #. Depending on your preferred development environment:
 
    * If you want to work with |VSC|, install the |nRFVSC| (the default IDE for the |NCS|).

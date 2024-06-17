@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
+#pragma once
 
 #include <stdint.h>
 #include "cracen_psa.h"
@@ -10,16 +11,19 @@
 #define CRACEN_KMU_MAX_KEY_SIZE	 32
 #define CRACEN_KMU_SLOT_KEY_SIZE 16
 
-/* This can be converted to bits by (value + 1) << 6 */
 enum kmu_metadata_key_bits {
 	METADATA_ALG_KEY_BITS_128 = 1,
 	METADATA_ALG_KEY_BITS_192 = 2,
-	METADATA_ALG_KEY_BITS_256 = 3,
+	METADATA_ALG_KEY_BITS_255 = 3,
+	METADATA_ALG_KEY_BITS_256 = 4,
+	METADATA_ALG_KEY_BITS_384_SEED = 5,
+	METADATA_ALG_KEY_BITS_RESERVED_1 = 6,
+	METADATA_ALG_KEY_BITS_RESERVED_2 = 7,
 };
 
 typedef struct {
 	uint8_t key_usage_scheme: 2; /* value of @ref kmu_metadata_key_usage_scheme. */
-	uint8_t number_of_slots: 2;  /* Number of slots to push. */
+	uint8_t number_of_slots: 3;  /* Number of slots to push. */
 	uint8_t slot_id;	     /* KMU slot number. */
 } kmu_opaque_key_buffer;
 
@@ -51,7 +55,7 @@ extern uint8_t kmu_push_area[64];
  * @brief Callback function that prepares a key for usage by Cracen.
  *
  * @param[in] user_data
- * @return Silex status code.
+ * @return sxsymcrypt status code.
  */
 int cracen_kmu_prepare_key(const uint8_t *user_data);
 
@@ -59,21 +63,9 @@ int cracen_kmu_prepare_key(const uint8_t *user_data);
  * @brief Callback function that clears transient buffers related to key handling.
  *
  * @param[in] user_data
- * @return Silex status code.
+ * @return sxsymcrypt status code.
  */
 int cracen_kmu_clean_key(const uint8_t *user_data);
-
-/**
- * @brief Retrieves the slot number for a given key handle.
- *
- * @param[in]  key_id      Key handler.
- * @param[out] lifetime    Lifetime for key.
- * @param[out] slot_number The key's slot number.
- *
- * @return psa_status_t
- */
-psa_status_t cracen_kmu_get_key_slot(mbedtls_svc_key_id_t key_id, psa_key_lifetime_t *lifetime,
-				     psa_drv_slot_number_t *slot_number);
 
 /**
  * @brief Retrieves attributes and opaque key buffer for key.

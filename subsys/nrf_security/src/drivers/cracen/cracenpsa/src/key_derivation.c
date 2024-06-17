@@ -22,7 +22,7 @@
 #include <string.h>
 
 #define uint32_to_be(i)                                                                            \
-	((((i) & 0xFF) << 24) | ((((i) >> 8) & 0xFF) << 16) | ((((i) >> 16) & 0xFF) << 8) |        \
+	((((i)&0xFF) << 24) | ((((i) >> 8) & 0xFF) << 16) | ((((i) >> 16) & 0xFF) << 8) |          \
 	 (((i) >> 24) & 0xFF))
 
 static psa_status_t ecc_key_agreement_check_alg(psa_algorithm_t alg)
@@ -263,6 +263,8 @@ psa_status_t cracen_key_derivation_setup(cracen_key_derivation_operation_t *oper
 
 	if (IS_ENABLED(PSA_NEED_CRACEN_TLS12_ECJPAKE_TO_PMS)) {
 		if (operation->alg == PSA_ALG_TLS12_ECJPAKE_TO_PMS) {
+			operation->capacity = PSA_TLS12_ECJPAKE_TO_PMS_DATA_SIZE;
+			operation->state = CRACEN_KD_STATE_TLS12_ECJPAKE_TO_PMS_INIT;
 			return PSA_SUCCESS;
 		}
 	}
@@ -617,6 +619,10 @@ psa_status_t cracen_key_derivation_input_bytes(cracen_key_derivation_operation_t
 
 	if (IS_ENABLED(PSA_NEED_CRACEN_TLS12_ECJPAKE_TO_PMS) &&
 	    operation->alg == PSA_ALG_TLS12_ECJPAKE_TO_PMS) {
+		if (operation->state != CRACEN_KD_STATE_TLS12_ECJPAKE_TO_PMS_INIT) {
+			return PSA_ERROR_BAD_STATE;
+		}
+		operation->state = CRACEN_KD_STATE_TLS12_ECJPAKE_TO_PMS_OUTPUT;
 		if (data_length != 65 || data[0] != 0x04) {
 			return PSA_ERROR_INVALID_ARGUMENT;
 		}
@@ -646,7 +652,8 @@ psa_status_t cracen_key_derivation_input_key(cracen_key_derivation_operation_t *
 	psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
 
 	if (operation->alg != PSA_ALG_SP800_108_COUNTER_CMAC) {
-		return PSA_ERROR_NOT_SUPPORTED;
+		return cracen_key_derivation_input_bytes(operation, step, key_buffer,
+							 key_buffer_size);
 	}
 
 	if (psa_get_key_type(attributes) != PSA_KEY_TYPE_AES) {
@@ -668,7 +675,7 @@ psa_status_t cracen_key_derivation_input_key(cracen_key_derivation_operation_t *
 	memcpy(operation->cmac_ctr.key_buffer, key_buffer,
 	       PSA_BITS_TO_BYTES(psa_get_key_bits(attributes)));
 
-	status = cracen_load_keyref(attributes, key_buffer, key_buffer_size,
+	status = cracen_load_keyref(attributes, operation->cmac_ctr.key_buffer, key_buffer_size,
 				    &operation->cmac_ctr.keyref);
 	if (status != PSA_SUCCESS) {
 		return status;
@@ -1085,7 +1092,8 @@ psa_status_t cracen_key_derivation_output_bytes(cracen_key_derivation_operation_
 
 	if (IS_ENABLED(PSA_NEED_CRACEN_SP800_108_COUNTER_CMAC) &&
 	    (operation->alg == PSA_ALG_SP800_108_COUNTER_CMAC)) {
-		if (operation->state == CRACEN_KD_STATE_CMAC_CTR_INPUT_LABEL ||
+		if (operation->state == CRACEN_KD_STATE_CMAC_CTR_KEY_LOADED ||
+		    operation->state == CRACEN_KD_STATE_CMAC_CTR_INPUT_LABEL ||
 		    operation->state == CRACEN_KD_STATE_CMAC_CTR_INPUT_CONTEXT ||
 		    operation->state == CRACEN_KD_STATE_CMAC_CTR_OUTPUT) {
 			if (operation->state != CRACEN_KD_STATE_CMAC_CTR_OUTPUT) {

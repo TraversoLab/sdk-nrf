@@ -229,8 +229,6 @@ To enable key derivation function (KDF) support, set one or more of the Kconfig 
 | TLS 1.2 EC J-PAKE to PMS | :kconfig:option:`CONFIG_PSA_WANT_ALG_TLS12_ECJPAKE_TO_PMS`    |
 +--------------------------+---------------------------------------------------------------+
 
-.. note::
-   PBKDF2 algorithms are not supported with TF-M.
 
 Key derivation function support
 ===============================
@@ -630,6 +628,9 @@ The PSA drivers using the Arm CryptoCell peripheral is enabled by default for nR
 
 For devices without a hardware-accelerated cryptographic engine, entropy is provided by the nRF RNG peripheral. PRNG support is provided by the Oberon PSA driver, which is implemented using software.
 
+.. note::
+   When using CryptoCell, only 1024 bytes can be requested at a time.
+
 Hash configurations
 *******************
 
@@ -747,7 +748,6 @@ To enable password-authenticated key exchange (PAKE) support, set one or more of
 
 .. note::
    * The provided support is experimental.
-   * Not supported with TF-M.
 
 Password-authenticated key exchange support
 ===========================================
@@ -794,23 +794,23 @@ RSA key size configuration
 
 To enable RSA key size support, set one or more of the Kconfig options in the following table:
 
-+--------------------+-----------------------------------------------------+
-| RSA key size       | Configuration option                                |
-+====================+=====================================================+
-| 1024 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_1024` |
-+--------------------+-----------------------------------------------------+
-| 1536 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_1536` |
-+--------------------+-----------------------------------------------------+
-| 2048 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_2048` |
-+--------------------+-----------------------------------------------------+
-| 3072 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_3072` |
-+--------------------+-----------------------------------------------------+
-| 4096 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_4096` |
-+--------------------+-----------------------------------------------------+
-| 6144 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_6144` |
-+--------------------+-----------------------------------------------------+
-| 8192 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_8192` |
-+--------------------+-----------------------------------------------------+
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| RSA key size       | Configuration option                                | nrf_cc3xx driver support | nrf_oberon driver support | nrf_cracen driver support |
++====================+=====================================================+==========================+===========================+===========================+
+| 1024 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_1024` | Supported                | Supported                 | Not supported             |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| 1536 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_1536` | Supported                | Supported                 | Not supported             |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| 2048 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_2048` | Supported                | Supported                 | Supported                 |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| 3072 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_3072` | Supported (CC312 only)   | Supported                 | Supported                 |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| 4096 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_4096` | Not supported            | Supported                 | Supported                 |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| 6144 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_6144` | Not supported            | Supported                 | Not supported             |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
+| 8192 bits          | :kconfig:option:`CONFIG_PSA_WANT_RSA_KEY_SIZE_8192` | Not supported            | Supported                 | Not supported             |
++--------------------+-----------------------------------------------------+--------------------------+---------------------------+---------------------------+
 
 .. note::
    All RSA key size configurations are introduced by :ref:`nrf_security` and are not described by the PSA Crypto specification.

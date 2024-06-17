@@ -33,7 +33,7 @@ You can find an overview of currently supported bootloaders in the table below:
      - Can be second-stage
      - Key type support
      - Public key revocation
-     - SMP updates
+     - SMP updates by the application
      - Downgrade protection
      - Versioning
      - Update methods (supported by |NCS|)
@@ -48,7 +48,7 @@ You can find an overview of currently supported bootloaders in the table below:
      - Dual-slot direct-xip
    * - :doc:`MCUboot <mcuboot:index-ncs>`
      - Yes
-     - Yes
+     - Yes (only with :ref:`NSIB <bootloader>` as first-stage)
      - :doc:`See imgtool <mcuboot:imgtool>`
      - No
      - Yes

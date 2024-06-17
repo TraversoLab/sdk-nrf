@@ -7,6 +7,7 @@
 #include "common.h"
 #include <cracen/mem_helpers.h>
 #include "cracen_psa.h"
+#include "platform_keys/platform_keys.h"
 
 #include <sicrypto/drbghash.h>
 #include <sicrypto/ecc.h>
@@ -139,27 +140,27 @@ static psa_status_t check_ecc_key_attributes(const psa_key_attributes_t *attribu
 
 	switch (curve) {
 	case PSA_ECC_FAMILY_BRAINPOOL_P_R1:
-		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_BRAINPOOL_P_R1)) {
+		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_BRAINPOOL_P_R1)) {
 			status = check_brainpool_alg_and_key_bits(key_alg, key_bits);
 		}
 		break;
 	case PSA_ECC_FAMILY_SECP_K1:
-		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_SECP_K1)) {
+		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_SECP_K1)) {
 			status = check_secp_k1_alg_and_key_bits(key_alg, key_bits);
 		}
 		break;
 	case PSA_ECC_FAMILY_SECP_R1:
-		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_SECP_R1)) {
+		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_SECP_R1)) {
 			status = check_secp_r1_alg_and_key_bits(key_alg, key_bits);
 		}
 		break;
 	case PSA_ECC_FAMILY_MONTGOMERY:
-		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_MONTGOMERY)) {
+		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_MONTGOMERY)) {
 			status = check_montgmr_alg_and_key_bits(key_alg, key_bits);
 		}
 		break;
 	case PSA_ECC_FAMILY_TWISTED_EDWARDS:
-		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_TWISTED_EDWARDS)) {
+		if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_TWISTED_EDWARDS)) {
 			status = check_edwards_alg_and_key_bits(key_alg, key_bits);
 		}
 		break;
@@ -436,14 +437,19 @@ static psa_status_t import_spake2p_key(const psa_key_attributes_t *attributes, c
 	size_t bits = psa_get_key_bits(attributes);
 	psa_key_type_t type = psa_get_key_type(attributes);
 
+	/* Check for invalid key bits*/
+	if (bits != 0 && (bits != 256)) {
+		return PSA_ERROR_INVALID_ARGUMENT;
+	}
+
+	/* We only support 256 bit keys and they PSA APIs does not enforce setting the key bits. */
+	bits = 256;
+
 	switch (type) {
 	case PSA_KEY_TYPE_SPAKE2P_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1):
 		/* These keys contains w0 and w1. */
 		if (data_length != CRACEN_P256_KEY_SIZE * 2) {
 			return PSA_ERROR_NOT_SUPPORTED;
-		}
-		if (bits != 0 && (bits != 256)) {
-			return PSA_ERROR_INVALID_ARGUMENT;
 		}
 		/* Do not allow w0 to be 0. */
 		if (constant_memcmp_is_zero(data, CRACEN_P256_KEY_SIZE)) {
@@ -460,9 +466,6 @@ static psa_status_t import_spake2p_key(const psa_key_attributes_t *attributes, c
 		/* These keys contains w0 and L. L is an uncompressed point. */
 		if (data_length != CRACEN_P256_KEY_SIZE + CRACEN_P256_POINT_SIZE + 1) {
 			return PSA_ERROR_NOT_SUPPORTED;
-		}
-		if (bits != 0 && (bits != 256)) {
-			return PSA_ERROR_INVALID_ARGUMENT;
 		}
 
 		/* Do not allow w0 to be 0. */
@@ -854,7 +857,7 @@ psa_status_t cracen_export_public_key(const psa_key_attributes_t *attributes,
 		return PSA_ERROR_INVALID_ARGUMENT;
 	}
 
-	if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_ANY_ECC)) {
+	if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_KEY_PAIR_EXPORT)) {
 		if (PSA_KEY_TYPE_IS_ECC_KEY_PAIR(key_type)) {
 			return export_ecc_public_key_from_keypair(attributes, key_buffer,
 								  key_buffer_size, data, data_size,
@@ -865,15 +868,14 @@ psa_status_t cracen_export_public_key(const psa_key_attributes_t *attributes,
 		}
 	}
 
-	if (IS_ENABLED(PSA_NEED_CRACEN_ANY_RSA_KEY_SIZE)) {
-		if (key_type == PSA_KEY_TYPE_RSA_KEY_PAIR) {
-			return export_rsa_public_key_from_keypair(attributes, key_buffer,
-								  key_buffer_size, data, data_size,
-								  data_length);
-		} else if (key_type == PSA_KEY_TYPE_RSA_PUBLIC_KEY) {
-			return rsa_export_public_key(attributes, key_buffer, key_buffer_size, data,
-						     data_size, data_length);
-		}
+	if (key_type == PSA_KEY_TYPE_RSA_KEY_PAIR &&
+	    IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_RSA_KEY_PAIR_EXPORT)) {
+		return export_rsa_public_key_from_keypair(attributes, key_buffer, key_buffer_size,
+							  data, data_size, data_length);
+	} else if (key_type == PSA_KEY_TYPE_RSA_PUBLIC_KEY &&
+		   IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_RSA_PUBLIC_KEY)) {
+		return rsa_export_public_key(attributes, key_buffer, key_buffer_size, data,
+					     data_size, data_length);
 	}
 
 	return PSA_ERROR_NOT_SUPPORTED;
@@ -899,7 +901,8 @@ psa_status_t cracen_import_key(const psa_key_attributes_t *attributes, const uin
 		PSA_KEY_LIFETIME_GET_LOCATION(psa_get_key_lifetime(attributes));
 #ifdef CONFIG_PSA_NEED_CRACEN_KMU_DRIVER
 	if (location == PSA_KEY_LOCATION_CRACEN_KMU) {
-		int slot_id = CRACEN_PSA_GET_KMU_SLOT(psa_get_key_id(attributes));
+		int slot_id = CRACEN_PSA_GET_KMU_SLOT(
+			MBEDTLS_SVC_KEY_ID_GET_KEY_ID(psa_get_key_id(attributes)));
 		psa_key_attributes_t stored_attributes;
 
 		if (key_buffer_size < cracen_get_opaque_size(attributes)) {
@@ -928,7 +931,7 @@ psa_status_t cracen_import_key(const psa_key_attributes_t *attributes, const uin
 		return PSA_ERROR_NOT_SUPPORTED;
 	}
 
-	if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_ANY_ECC)) {
+	if (IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_KEY_PAIR_IMPORT)) {
 		if (PSA_KEY_TYPE_IS_ECC_KEY_PAIR(key_type)) {
 			return import_ecc_private_key(attributes, data, data_length, key_buffer,
 						      key_buffer_size, key_buffer_length, key_bits);
@@ -938,11 +941,10 @@ psa_status_t cracen_import_key(const psa_key_attributes_t *attributes, const uin
 		}
 	}
 
-	if (IS_ENABLED(PSA_NEED_CRACEN_ANY_RSA_KEY_SIZE)) {
-		if (PSA_KEY_TYPE_IS_RSA(key_type)) {
-			return import_rsa_key(attributes, data, data_length, key_buffer,
-					      key_buffer_size, key_buffer_length, key_bits);
-		}
+	if (PSA_KEY_TYPE_IS_RSA(key_type) &&
+	    IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_RSA_KEY_PAIR_IMPORT)) {
+		return import_rsa_key(attributes, data, data_length, key_buffer, key_buffer_size,
+				      key_buffer_length, key_bits);
 	}
 
 	if (PSA_KEY_TYPE_IS_SPAKE2P(key_type) && IS_ENABLED(PSA_NEED_CRACEN_SPAKE2P)) {
@@ -1100,6 +1102,37 @@ error_exit:
 #endif /* PSA_MAX_RSA_KEY_BITS > 0*/
 }
 
+psa_status_t generate_key_for_kmu(const psa_key_attributes_t *attributes, uint8_t *key_buffer,
+				  size_t key_buffer_size, size_t *key_buffer_length)
+{
+	psa_key_type_t key_type = psa_get_key_type(attributes);
+	uint8_t key[CRACEN_KMU_MAX_KEY_SIZE];
+	size_t key_bits;
+	psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
+
+	if (PSA_BITS_TO_BYTES(psa_get_key_bits(attributes)) > sizeof(key)) {
+		return PSA_ERROR_NOT_SUPPORTED;
+	}
+
+	if (PSA_KEY_TYPE_IS_ECC_KEY_PAIR(key_type) &&
+	    IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_KEY_PAIR_GENERATE)) {
+		status = generate_ecc_private_key(attributes, key, sizeof(key), key_buffer_length);
+		if (status != PSA_SUCCESS) {
+			return status;
+		}
+	} else if (key_type == PSA_KEY_TYPE_AES) {
+		status = psa_generate_random(key, PSA_BITS_TO_BYTES(psa_get_key_bits(attributes)));
+		if (status != PSA_SUCCESS) {
+			return status;
+		}
+	} else {
+		return PSA_ERROR_NOT_SUPPORTED;
+	}
+
+	return cracen_import_key(attributes, key, PSA_BITS_TO_BYTES(psa_get_key_bits(attributes)),
+				 key_buffer, key_buffer_size, key_buffer_length, &key_bits);
+}
+
 psa_status_t cracen_generate_key(const psa_key_attributes_t *attributes, uint8_t *key_buffer,
 				 size_t key_buffer_size, size_t *key_buffer_length)
 {
@@ -1112,16 +1145,8 @@ psa_status_t cracen_generate_key(const psa_key_attributes_t *attributes, uint8_t
 
 #if CONFIG_PSA_NEED_CRACEN_KMU_DRIVER
 	if (location == PSA_KEY_LOCATION_CRACEN_KMU) {
-		uint8_t key[CRACEN_KMU_MAX_KEY_SIZE];
-		size_t key_bits;
-		psa_status_t status =
-			psa_generate_random(key, PSA_BITS_TO_BYTES(psa_get_key_bits(attributes)));
-		if (status != PSA_SUCCESS) {
-			return status;
-		}
-		return cracen_import_key(attributes, key,
-					 PSA_BITS_TO_BYTES(psa_get_key_bits(attributes)),
-					 key_buffer, key_buffer_size, key_buffer_length, &key_bits);
+		return generate_key_for_kmu(attributes, key_buffer, key_buffer_size,
+					    key_buffer_length);
 	}
 #endif
 
@@ -1133,18 +1158,16 @@ psa_status_t cracen_generate_key(const psa_key_attributes_t *attributes, uint8_t
 		return PSA_ERROR_INVALID_ARGUMENT;
 	}
 
-	if (IS_ENABLED(PSA_NEED_CRACEN_KEY_MANAGEMENT_ANY_ECC)) {
-		if (PSA_KEY_TYPE_IS_ECC_KEY_PAIR(key_type)) {
-			return generate_ecc_private_key(attributes, key_buffer, key_buffer_size,
-							key_buffer_length);
-		}
+	if (PSA_KEY_TYPE_IS_ECC_KEY_PAIR(key_type) &&
+	    IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_ECC_KEY_PAIR_GENERATE)) {
+		return generate_ecc_private_key(attributes, key_buffer, key_buffer_size,
+						key_buffer_length);
 	}
 
-	if (IS_ENABLED(PSA_NEED_CRACEN_ANY_RSA_KEY_SIZE)) {
-		if (key_type == PSA_KEY_TYPE_RSA_KEY_PAIR) {
-			return generate_rsa_private_key(attributes, key_buffer, key_buffer_size,
-							key_buffer_length);
-		}
+	if (key_type == PSA_KEY_TYPE_RSA_KEY_PAIR &&
+	    IS_ENABLED(PSA_NEED_CRACEN_KEY_TYPE_RSA_KEY_PAIR_GENERATE)) {
+		return generate_rsa_private_key(attributes, key_buffer, key_buffer_size,
+						key_buffer_length);
 	}
 
 	return PSA_ERROR_NOT_SUPPORTED;
@@ -1158,19 +1181,29 @@ size_t cracen_get_opaque_size(const psa_key_attributes_t *attributes)
 		case CRACEN_BUILTIN_IDENTITY_KEY_ID:
 			if (psa_get_key_type(attributes) ==
 			    PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1)) {
-				return 1;
+				return 2;
 			}
+			break;
 		case CRACEN_BUILTIN_MEXT_ID:
 		case CRACEN_BUILTIN_MKEK_ID:
 			if (psa_get_key_type(attributes) == PSA_KEY_TYPE_AES) {
-				return 1;
+				return 2;
 			}
+			break;
+#ifdef CONFIG_PSA_NEED_CRACEN_PLATFORM_KEYS
+		default:
+			return cracen_platform_keys_get_size(attributes);
+#endif
 		}
 	}
 
 	if (PSA_KEY_LIFETIME_GET_LOCATION(psa_get_key_lifetime(attributes)) ==
 	    PSA_KEY_LOCATION_CRACEN_KMU) {
-		return sizeof(kmu_opaque_key_buffer);
+		if (PSA_KEY_TYPE_IS_ECC(psa_get_key_type(attributes))) {
+			return PSA_BITS_TO_BYTES(psa_get_key_bits(attributes));
+		} else {
+			return sizeof(kmu_opaque_key_buffer);
+		}
 	}
 	return 0;
 }
@@ -1200,7 +1233,8 @@ psa_status_t cracen_get_builtin_key(psa_drv_slot_number_t slot_number,
 		 */
 		if (key_buffer_size >= cracen_get_opaque_size(attributes)) {
 			*key_buffer_length = cracen_get_opaque_size(attributes);
-			*key_buffer = slot_number;
+			key_buffer[0] = slot_number;
+			key_buffer[1] = MBEDTLS_SVC_KEY_ID_GET_OWNER_ID(psa_get_key_id(attributes));
 			return PSA_SUCCESS;
 		} else {
 			return PSA_ERROR_BUFFER_TOO_SMALL;
@@ -1214,7 +1248,7 @@ psa_status_t cracen_get_builtin_key(psa_drv_slot_number_t slot_number,
 							 PSA_KEY_LOCATION_CRACEN));
 		psa_set_key_type(attributes, PSA_KEY_TYPE_AES);
 		psa_set_key_bits(attributes, 256);
-		psa_set_key_algorithm(attributes, PSA_ALG_CMAC);
+		psa_set_key_algorithm(attributes, PSA_ALG_SP800_108_COUNTER_CMAC);
 		psa_set_key_usage_flags(attributes,
 					PSA_KEY_USAGE_DERIVE | PSA_KEY_USAGE_VERIFY_DERIVATION);
 
@@ -1223,7 +1257,8 @@ psa_status_t cracen_get_builtin_key(psa_drv_slot_number_t slot_number,
 		 */
 		if (key_buffer_size >= cracen_get_opaque_size(attributes)) {
 			*key_buffer_length = cracen_get_opaque_size(attributes);
-			*key_buffer = slot_number;
+			key_buffer[0] = slot_number;
+			key_buffer[1] = MBEDTLS_SVC_KEY_ID_GET_OWNER_ID(psa_get_key_id(attributes));
 			return PSA_SUCCESS;
 		} else {
 			return PSA_ERROR_BUFFER_TOO_SMALL;
@@ -1233,6 +1268,9 @@ psa_status_t cracen_get_builtin_key(psa_drv_slot_number_t slot_number,
 #if CONFIG_PSA_NEED_CRACEN_KMU_DRIVER
 		return cracen_kmu_get_builtin_key(slot_number, attributes, key_buffer,
 						  key_buffer_size, key_buffer_length);
+#elif CONFIG_PSA_NEED_CRACEN_PLATFORM_KEYS
+		return cracen_platform_get_builtin_key(slot_number, attributes, key_buffer,
+						       key_buffer_size, key_buffer_length);
 #else
 		return PSA_ERROR_DOES_NOT_EXIST;
 #endif
@@ -1256,6 +1294,8 @@ psa_status_t mbedtls_psa_platform_get_builtin_key(mbedtls_svc_key_id_t key_id,
 	default:
 #if CONFIG_PSA_NEED_CRACEN_KMU_DRIVER
 		return cracen_kmu_get_key_slot(key_id, lifetime, slot_number);
+#elif CONFIG_PSA_NEED_CRACEN_PLATFORM_KEYS
+		return cracen_platform_get_key_slot(key_id, lifetime, slot_number);
 #else
 		return PSA_ERROR_DOES_NOT_EXIST;
 #endif
@@ -1276,6 +1316,15 @@ psa_status_t cracen_export_key(const psa_key_attributes_t *attributes, const uin
 		PSA_KEY_LIFETIME_GET_LOCATION(psa_get_key_lifetime(attributes));
 
 	if (location == PSA_KEY_LOCATION_CRACEN_KMU) {
+		/* The keys will already be in the key buffer as they got loaded their by a previous
+		 * call to cracen_get_builtin_key or cached in the memory.
+		 */
+		if (PSA_KEY_TYPE_ECC_GET_FAMILY(psa_get_key_type(attributes)) ==
+		    PSA_ECC_FAMILY_TWISTED_EDWARDS) {
+			memcpy(data, key_buffer, key_buffer_size);
+			return PSA_SUCCESS;
+		}
+
 		int status = cracen_kmu_prepare_key(key_buffer);
 
 		if (status != SX_OK) {
@@ -1304,7 +1353,8 @@ psa_status_t cracen_destroy_key(const psa_key_attributes_t *attributes)
 		PSA_KEY_LIFETIME_GET_LOCATION(psa_get_key_lifetime(attributes));
 
 	if (location == PSA_KEY_LOCATION_CRACEN_KMU) {
-		uint32_t slot_id = CRACEN_PSA_GET_KMU_SLOT(psa_get_key_id(attributes));
+		uint32_t slot_id = CRACEN_PSA_GET_KMU_SLOT(
+			MBEDTLS_SVC_KEY_ID_GET_KEY_ID(psa_get_key_id(attributes)));
 		psa_status_t status = cracen_kmu_revoke_key_slot(slot_id++);
 
 		if (status != PSA_SUCCESS) {
@@ -1316,8 +1366,8 @@ psa_status_t cracen_destroy_key(const psa_key_attributes_t *attributes)
 		if (status != PSA_SUCCESS) {
 			return status;
 		}
-		if (CRACEN_PSA_GET_KEY_USAGE_SCHEME(psa_get_key_id(attributes)) ==
-		    KMU_METADATA_SCHEME_ENCRYPTED) {
+		if (CRACEN_PSA_GET_KEY_USAGE_SCHEME(MBEDTLS_SVC_KEY_ID_GET_KEY_ID(
+			    psa_get_key_id(attributes))) == KMU_METADATA_SCHEME_ENCRYPTED) {
 			status = cracen_kmu_revoke_key_slot(slot_id++);
 			if (status == PSA_SUCCESS) {
 				status = cracen_kmu_revoke_key_slot(slot_id++);

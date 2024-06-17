@@ -1803,7 +1803,7 @@ static void scene_recall(const struct bt_mesh_model *model, const uint8_t data[]
 			ctrl_enable(srv);
 		}
 
-		if (!!scene->light && !atomic_test_bit(&srv->flags, FLAG_ON)) {
+		if (!!scene->light) {
 			turn_on(srv, transition, true);
 		} else if (atomic_test_bit(&srv->flags, FLAG_ON)) {
 			transition_start(srv, LIGHT_CTRL_STATE_STANDBY, 0);
@@ -1970,7 +1970,6 @@ static int light_ctrl_srv_start(const struct bt_mesh_model *model)
 		break;
 	case BT_MESH_ON_POWER_UP_RESTORE:
 		if (is_enabled(srv)) {
-			reg_start(srv);
 			if (atomic_test_bit(&srv->flags, FLAG_ON)) {
 				turn_on(srv, NULL, true);
 			} else {

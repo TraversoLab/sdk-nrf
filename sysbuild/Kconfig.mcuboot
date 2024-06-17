@@ -79,11 +79,27 @@ config MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT
 	  to downgrade running application, but note that MCUboot may do that
 	  if application with higher version will not get confirmed.
 
+config MCUBOOT_MODE_FIRMWARE_UPDATER
+	bool "Firmware updater"
+	help
+	  MCUboot will only boot slot0_partition for the main application but has
+	  an entrance mechanism defined for entering the slot1_partition which is
+	  a dedicated firmware updater application used to update the slot0_partition
+	  application.
+
 endchoice
+
+config MCUBOOT_BUILD_DIRECT_XIP_VARIANT
+	bool "Build DirectXIP variant image"
+	depends on MCUBOOT_MODE_DIRECT_XIP || MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT
+	default y
+	help
+	  Will build the alternative slot (variant) image of the main application.
 
 menuconfig MCUBOOT_HARDWARE_DOWNGRADE_PREVENTION
 	bool "Downgrade prevention using hardware security counters"
-	depends on ($(BOARD) = "nrf5340dk_nrf5340_cpuapp" || $(BOARD) = "nrf5340dk_nrf5340_cpuapp_ns" || $(BOARD) = "thingy53_nrf5340_cpuapp" || $(BOARD) = "thingy53_nrf5340_cpuapp_ns" || $(BOARD) = "nrf9160dk_nrf9160" || $(BOARD) = "nrf9160dk_nrf9160_ns" || $(BOARD) = "thingy91_nrf9160" || $(BOARD) = "thingy91_nrf9160_ns" || $(BOARD) = "nrf7002dk_nrf5340_cpuapp" || $(BOARD) = "nrf7002dk_nrf5340_cpuapp_ns")
+	depends on (SOC_NRF5340_CPUAPP || SOC_SERIES_NRF91X)
+	depends on !SECURE_BOOT_APPCORE
 	help
 	  This option can be enabled by the application and will ensure
 	  that the MCUBOOT_HW_DOWNGRADE_PREVENTION Kconfig option is
@@ -122,10 +138,20 @@ config MCUBOOT_MAX_UPDATEABLE_IMAGES
 config MCUBOOT_UPDATEABLE_IMAGES
 	int "Updateable images"
 	range 3 MCUBOOT_MAX_UPDATEABLE_IMAGES if QSPI_XIP_SUPPORT
-	range 2 MCUBOOT_MAX_UPDATEABLE_IMAGES if NETCORE_APP_UPDATE
+	range 3 MCUBOOT_MAX_UPDATEABLE_IMAGES if NETCORE_APP_UPDATE && (WIFI_PATCHES_EXT_FLASH_XIP || WIFI_PATCHES_EXT_FLASH_STORE)
+	range 2 MCUBOOT_MAX_UPDATEABLE_IMAGES if NETCORE_APP_UPDATE || WIFI_PATCHES_EXT_FLASH_XIP || WIFI_PATCHES_EXT_FLASH_STORE
 	range 1 MCUBOOT_MAX_UPDATEABLE_IMAGES
+	default 2 if SOC_SERIES_NRF91X && SECURE_BOOT_APPCORE && (MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH || MCUBOOT_MODE_SWAP_SCRATCH || MCUBOOT_MODE_OVERWRITE_ONLY)
 	help
 	  The number of images that MCUboot will be built with.
+
+config MCUBOOT_APP_SYNC_UPDATEABLE_IMAGES
+	bool "Sync updateable image value to main application"
+	default n if SOC_SERIES_NRF91X && SECURE_BOOT_APPCORE && (MCUBOOT_MODE_SWAP_WITHOUT_SCRATCH || MCUBOOT_MODE_SWAP_SCRATCH || MCUBOOT_MODE_OVERWRITE_ONLY)
+	default y
+	help
+	  If enabled then will synchronise the value of ``MCUBOOT_UPDATEABLE_IMAGES`` to MCUboot
+	  and the main application, if disable then will only set this value to MCUboot
 
 config SECURE_BOOT_MCUBOOT_VERSION
 	string "MCUboot S0/S1 image update version"
@@ -134,5 +160,16 @@ config SECURE_BOOT_MCUBOOT_VERSION
 	depends on BOOTLOADER_MCUBOOT
 	help
 	  The version of the MCUboot S0/S1 upgrade package
+
+if BOOTLOADER_MCUBOOT
+
+choice BOOT_SIGNATURE_TYPE
+	default BOOT_SIGNATURE_TYPE_RSA if THINGY91_STATIC_PARTITIONS_FACTORY
+	default BOOT_SIGNATURE_TYPE_ECDSA_P256 if ((SOC_NRF52840 || SOC_SERIES_NRF91X) && !BOARD_THINGY91_NRF9160 && !BOARD_THINGY91_NRF52840)
+	default BOOT_SIGNATURE_TYPE_ECDSA_P256 if SECURE_BOOT_APPCORE
+
+endchoice
+
+endif
 
 endmenu

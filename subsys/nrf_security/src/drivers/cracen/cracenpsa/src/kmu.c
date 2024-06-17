@@ -15,11 +15,11 @@
 #include <zephyr/sys/__assert.h>
 
 #include "cracen_psa.h"
+#include "common.h"
 #include "kmu.h"
-#include "zephyr/sys/__assert.h"
 
 /* NCSDK-25121: Ensure address of this array is at a fixed address. */
-uint8_t kmu_push_area[64] __aligned(8);
+uint8_t kmu_push_area[64] __aligned(16);
 
 typedef struct kmu_metadata {
 	uint32_t metadata_version: 4;
@@ -42,7 +42,7 @@ enum kmu_metadata_algorithm {
 	METADATA_ALG_AES_CBC = 7,
 	METADATA_ALG_SP800_108_COUNTER_CMAC = 8,
 	METADATA_ALG_CMAC = 9,
-	METADATA_ALG_RESERVED0 = 10,
+	METADATA_ALG_ED25519 = 10,
 	METADATA_ALG_RESERVED1 = 11,
 	METADATA_ALG_RESERVED2 = 12,
 	METADATA_ALG_RESERVED3 = 13,
@@ -54,7 +54,7 @@ static const psa_key_usage_t metadata_usage_flags_mapping[] = {
 	/* ENCRYPT */ PSA_KEY_USAGE_ENCRYPT,
 	/* DECRYPT */ PSA_KEY_USAGE_DECRYPT,
 	/* SIGN */ PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_SIGN_MESSAGE,
-	/* VERIFY */ PSA_KEY_USAGE_VERIFY_HASH | PSA_KEY_USAGE_VERIFY_HASH,
+	/* VERIFY */ PSA_KEY_USAGE_VERIFY_HASH | PSA_KEY_USAGE_VERIFY_MESSAGE,
 	/* DERIVE */ PSA_KEY_USAGE_DERIVE,
 	/* EXPORT */ PSA_KEY_USAGE_EXPORT,
 	/* COPY */ PSA_KEY_USAGE_COPY};
@@ -72,7 +72,7 @@ static psa_status_t get_encryption_key(const uint8_t *context, uint8_t *key)
 	psa_status_t status;
 	psa_key_attributes_t mkek_attr = PSA_KEY_ATTRIBUTES_INIT;
 
-	psa_set_key_id(&mkek_attr, CRACEN_BUILTIN_MKEK_ID);
+	psa_set_key_id(&mkek_attr, mbedtls_svc_key_id_make(0, CRACEN_BUILTIN_MKEK_ID));
 	psa_set_key_lifetime(&mkek_attr,
 			     PSA_KEY_LIFETIME_FROM_PERSISTENCE_AND_LOCATION(
 				     PSA_KEY_PERSISTENCE_READ_ONLY, PSA_KEY_LOCATION_CRACEN));
@@ -227,6 +227,12 @@ bool is_secondary_slot(kmu_metadata *metadata)
 	return memcmp(&value, metadata, sizeof(value)) == 0;
 }
 
+static bool can_sign(const psa_key_attributes_t *key_attr)
+{
+	return (psa_get_key_usage_flags(key_attr) & PSA_KEY_USAGE_SIGN_MESSAGE) ||
+	       (psa_get_key_usage_flags(key_attr) & PSA_KEY_USAGE_SIGN_HASH);
+}
+
 psa_status_t convert_to_psa_attributes(kmu_metadata *metadata, psa_key_attributes_t *key_attr)
 {
 	memset(key_attr, 0, sizeof(*key_attr));
@@ -241,6 +247,27 @@ psa_status_t convert_to_psa_attributes(kmu_metadata *metadata, psa_key_attribute
 
 	psa_set_key_lifetime(key_attr, PSA_KEY_LIFETIME_FROM_PERSISTENCE_AND_LOCATION(
 					       readonly, PSA_KEY_LOCATION_CRACEN_KMU));
+
+	if (metadata->key_usage_scheme == KMU_METADATA_SCHEME_SEED) {
+		psa_set_key_type(key_attr, PSA_KEY_TYPE_RAW_DATA);
+		psa_set_key_bits(key_attr, 384);
+		return PSA_SUCCESS;
+	}
+
+	psa_key_usage_t usage_flags = 0;
+
+	uint32_t metadata_usage_flags = metadata->usage_flags;
+
+	for (size_t i = 0; metadata_usage_flags; i++) {
+		if (metadata_usage_flags & 1) {
+			if (i >= ARRAY_SIZE(metadata_usage_flags_mapping)) {
+				return PSA_ERROR_GENERIC_ERROR;
+			}
+			usage_flags |= metadata_usage_flags_mapping[i];
+		}
+
+		metadata_usage_flags >>= 1;
+	}
 
 	switch (metadata->algorithm) {
 	case METADATA_ALG_CHACHA20:
@@ -281,6 +308,15 @@ psa_status_t convert_to_psa_attributes(kmu_metadata *metadata, psa_key_attribute
 		psa_set_key_type(key_attr, PSA_KEY_TYPE_AES);
 		psa_set_key_algorithm(key_attr, PSA_ALG_CMAC);
 		break;
+	case METADATA_ALG_ED25519:
+		/* If the key can sign it is assumed it is a private key */
+		psa_set_key_type(
+			key_attr,
+			can_sign(key_attr)
+				? PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_TWISTED_EDWARDS)
+				: PSA_KEY_TYPE_ECC_PUBLIC_KEY(PSA_ECC_FAMILY_TWISTED_EDWARDS));
+		psa_set_key_algorithm(key_attr, PSA_ALG_PURE_EDDSA);
+		break;
 	default:
 		return PSA_ERROR_HARDWARE_FAILURE;
 	}
@@ -292,24 +328,12 @@ psa_status_t convert_to_psa_attributes(kmu_metadata *metadata, psa_key_attribute
 	case METADATA_ALG_KEY_BITS_192:
 		psa_set_key_bits(key_attr, 192);
 		break;
+	case METADATA_ALG_KEY_BITS_255:
+		psa_set_key_bits(key_attr, 255);
+		break;
 	case METADATA_ALG_KEY_BITS_256:
 		psa_set_key_bits(key_attr, 256);
 		break;
-	}
-
-	psa_key_usage_t usage_flags = 0;
-
-	uint32_t metadata_usage_flags = metadata->usage_flags;
-
-	for (size_t i = 0; metadata_usage_flags; i++) {
-		if (metadata_usage_flags & 1) {
-			if (i > ARRAY_SIZE(metadata_usage_flags_mapping)) {
-				return PSA_ERROR_GENERIC_ERROR;
-			}
-			usage_flags |= metadata_usage_flags_mapping[i];
-		}
-
-		metadata_usage_flags >>= 1;
 	}
 
 	psa_set_key_usage_flags(key_attr, usage_flags);
@@ -341,6 +365,34 @@ psa_status_t convert_from_psa_attributes(const psa_key_attributes_t *key_attr,
 {
 	memset(metadata, 0, sizeof(*metadata));
 	metadata->metadata_version = 0;
+
+	metadata->key_usage_scheme = CRACEN_PSA_GET_KEY_USAGE_SCHEME(
+		MBEDTLS_SVC_KEY_ID_GET_KEY_ID(psa_get_key_id(key_attr)));
+
+	switch (metadata->key_usage_scheme) {
+	case KMU_METADATA_SCHEME_PROTECTED:
+	case KMU_METADATA_SCHEME_SEED:
+	case KMU_METADATA_SCHEME_ENCRYPTED:
+	case KMU_METADATA_SCHEME_RAW:
+		break;
+	default:
+		return PSA_ERROR_INVALID_ARGUMENT;
+	}
+
+	if (metadata->key_usage_scheme == KMU_METADATA_SCHEME_PROTECTED) {
+		if (psa_get_key_usage_flags(key_attr) & PSA_KEY_USAGE_EXPORT) {
+			return PSA_ERROR_INVALID_ARGUMENT;
+		}
+		if (psa_get_key_usage_flags(key_attr) & PSA_KEY_USAGE_COPY) {
+			return PSA_ERROR_INVALID_ARGUMENT;
+		}
+	}
+
+	if (metadata->key_usage_scheme == KMU_METADATA_SCHEME_SEED) {
+		metadata->rpolicy = LIB_KMU_REV_POLICY_LOCKED;
+		metadata->size = METADATA_ALG_KEY_BITS_384_SEED;
+		return PSA_SUCCESS;
+	}
 
 	switch (psa_get_key_algorithm(key_attr)) {
 	case PSA_ALG_STREAM_CIPHER:
@@ -399,6 +451,19 @@ psa_status_t convert_from_psa_attributes(const psa_key_attributes_t *key_attr,
 			return PSA_ERROR_NOT_SUPPORTED;
 		}
 		break;
+
+	case PSA_ALG_PURE_EDDSA:
+		if (PSA_KEY_TYPE_ECC_GET_FAMILY(psa_get_key_type(key_attr)) !=
+		    PSA_ECC_FAMILY_TWISTED_EDWARDS) {
+			return PSA_ERROR_NOT_SUPPORTED;
+		}
+		/* Don't support private keys that are only used for verify */
+		if (!can_sign(key_attr) &&
+		    PSA_KEY_TYPE_IS_ECC_KEY_PAIR(psa_get_key_type(key_attr))) {
+			return PSA_ERROR_NOT_SUPPORTED;
+		}
+		metadata->algorithm = METADATA_ALG_ED25519;
+		break;
 	default:
 		return PSA_ERROR_NOT_SUPPORTED;
 	}
@@ -423,6 +488,9 @@ psa_status_t convert_from_psa_attributes(const psa_key_attributes_t *key_attr,
 	case 192:
 		metadata->size = METADATA_ALG_KEY_BITS_192;
 		break;
+	case 255:
+		metadata->size = METADATA_ALG_KEY_BITS_255;
+		break;
 	case 256:
 		metadata->size = METADATA_ALG_KEY_BITS_256;
 		break;
@@ -430,10 +498,8 @@ psa_status_t convert_from_psa_attributes(const psa_key_attributes_t *key_attr,
 		return PSA_ERROR_NOT_SUPPORTED;
 	}
 
-	metadata->key_usage_scheme = CRACEN_PSA_GET_KEY_USAGE_SCHEME(psa_get_key_id(key_attr));
-	if (metadata->key_usage_scheme > KMU_METADATA_SCHEME_RAW) {
-		return PSA_ERROR_INVALID_ARGUMENT;
-	}
+	metadata->key_usage_scheme = CRACEN_PSA_GET_KEY_USAGE_SCHEME(
+		MBEDTLS_SVC_KEY_ID_GET_KEY_ID(psa_get_key_id(key_attr)));
 
 	if (metadata->key_usage_scheme == KMU_METADATA_SCHEME_PROTECTED) {
 		if (psa_get_key_usage_flags(key_attr) & PSA_KEY_USAGE_EXPORT) {
@@ -466,11 +532,6 @@ psa_status_t cracen_kmu_provision(const psa_key_attributes_t *key_attr, int slot
 	uint8_t encrypted_workmem[CRACEN_KMU_SLOT_KEY_SIZE * 4];
 	size_t encrypted_outlen = 0;
 
-	/* Only 128, 192 and 256 bit keys are supported. */
-	if (key_buffer_size != 16 && key_buffer_size != 24 && key_buffer_size != 32) {
-		return PSA_ERROR_INVALID_ARGUMENT;
-	}
-
 	psa_status_t status = convert_from_psa_attributes(key_attr, &metadata);
 
 	if (status) {
@@ -480,10 +541,23 @@ psa_status_t cracen_kmu_provision(const psa_key_attributes_t *key_attr, int slot
 	switch (metadata.key_usage_scheme) {
 	case KMU_METADATA_SCHEME_PROTECTED:
 		push_address = (uint8_t *)CRACEN_PROTECTED_RAM_AES_KEY0;
+		/* Only 128, 192 and 256 bit keys are supported. */
+		if (key_buffer_size != 16 && key_buffer_size != 24 && key_buffer_size != 32) {
+			return PSA_ERROR_INVALID_ARGUMENT;
+		}
 		break;
 	case KMU_METADATA_SCHEME_ENCRYPTED:
 	case KMU_METADATA_SCHEME_RAW:
 		push_address = (uint8_t *)kmu_push_area;
+		if (key_buffer_size != 16 && key_buffer_size != 24 && key_buffer_size != 32) {
+			return PSA_ERROR_INVALID_ARGUMENT;
+		}
+		break;
+	case KMU_METADATA_SCHEME_SEED:
+		push_address = (uint8_t *)NRF_CRACEN->SEED;
+		if (key_buffer_size != 16 * 3) {
+			return PSA_ERROR_INVALID_ARGUMENT;
+		}
 		break;
 	default:
 		return PSA_ERROR_INVALID_ARGUMENT;
@@ -581,6 +655,23 @@ psa_status_t cracen_kmu_get_key_slot(mbedtls_svc_key_id_t key_id, psa_key_lifeti
 	return PSA_SUCCESS;
 }
 
+static psa_status_t push_kmu_key_to_ram(uint8_t *key_buffer, size_t key_buffer_size)
+{
+	if (key_buffer_size > sizeof(kmu_push_area)) {
+		return PSA_ERROR_BUFFER_TOO_SMALL;
+	}
+
+	psa_status_t status = silex_statuscodes_to_psa(cracen_kmu_prepare_key(key_buffer));
+
+	if (status) {
+		return status;
+	}
+
+	memcpy(key_buffer, kmu_push_area, key_buffer_size);
+
+	return PSA_SUCCESS;
+}
+
 psa_status_t cracen_kmu_get_builtin_key(psa_drv_slot_number_t slot_number,
 					psa_key_attributes_t *attributes, uint8_t *key_buffer,
 					size_t key_buffer_size, size_t *key_buffer_length)
@@ -594,9 +685,11 @@ psa_status_t cracen_kmu_get_builtin_key(psa_drv_slot_number_t slot_number,
 
 	psa_status_t status = PSA_SUCCESS;
 
-	if (attributes) {
-		status = convert_to_psa_attributes(&metadata, attributes);
+	if (!attributes) {
+		return PSA_ERROR_INVALID_ARGUMENT;
 	}
+
+	status = convert_to_psa_attributes(&metadata, attributes);
 
 	if (status != PSA_SUCCESS) {
 		return status;
@@ -607,13 +700,36 @@ psa_status_t cracen_kmu_get_builtin_key(psa_drv_slot_number_t slot_number,
 		kmu_opaque_key_buffer *key = (kmu_opaque_key_buffer *)key_buffer;
 
 		key->key_usage_scheme = metadata.key_usage_scheme;
-		key->number_of_slots = metadata.size > METADATA_ALG_KEY_BITS_128 ? 2 : 1;
+		switch (metadata.size) {
+		case METADATA_ALG_KEY_BITS_128:
+			key->number_of_slots = 1;
+			break;
+		case METADATA_ALG_KEY_BITS_192:
+		case METADATA_ALG_KEY_BITS_255:
+		case METADATA_ALG_KEY_BITS_256:
+			key->number_of_slots = 2;
+			break;
+		case METADATA_ALG_KEY_BITS_384_SEED:
+			key->number_of_slots = 3;
+			break;
+		default:
+			return PSA_ERROR_DATA_INVALID;
+		}
+
 		if (key->key_usage_scheme == KMU_METADATA_SCHEME_ENCRYPTED) {
 			key->number_of_slots += 2;
 		}
+
 		key->slot_id = slot_number;
-		return PSA_SUCCESS;
 	} else {
 		return PSA_ERROR_BUFFER_TOO_SMALL;
 	}
+
+	/* ED25519 keys are getting loading into the key buffer like volatile keys */
+	if (PSA_KEY_TYPE_ECC_GET_FAMILY(psa_get_key_type(attributes)) ==
+	    PSA_ECC_FAMILY_TWISTED_EDWARDS) {
+		return push_kmu_key_to_ram(key_buffer, key_buffer_size);
+	}
+
+	return PSA_SUCCESS;
 }

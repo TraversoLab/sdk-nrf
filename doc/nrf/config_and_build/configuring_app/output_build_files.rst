@@ -3,6 +3,10 @@
 Output build files (image files)
 ################################
 
+.. contents::
+   :local:
+   :depth: 2
+
 The building process produces each time an :term:`image file`.
 
 The image file can refer to an *executable*, a *program*, or an *ELF file*.
@@ -21,7 +25,7 @@ The |NCS| build system places output images in the :file:`<build folder>/zephyr`
 Common output build files
 *************************
 
-The following table lists build files that can be generated as output when building firmware for supported :ref:`build targets <app_boards>`.
+The following table lists build files that can be generated as output when building firmware for supported :ref:`board targets <app_boards>`.
 The table includes files for single-core and multi-core programming scenarios for both |VSC| and command-line building methods.
 Which files you are going to use depends on the application configuration and not directly on the type of SoC you are using.
 The following scenarios are possible:
@@ -34,41 +38,41 @@ The following scenarios are possible:
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
 | File                                     | Description                                                                                           | Programming scenario                                                                                      |
 +==========================================+=======================================================================================================+===========================================================================================================+
-| :file:`zephyr.hex`                       | Default full image.                                                                                   | * Programming build targets with :ref:`NSPE <app_boards_spe_nspe>` or single-image.                       |
+| :file:`zephyr.hex`                       | Default full image.                                                                                   | * Programming board targets with :ref:`NSPE <app_boards_spe_nspe>` or single-image.                       |
 |                                          | In a multi-image build, several :file:`zephyr.hex` files are generated, one for each image.           | * Testing DFU procedure with nrfjprog (programming directly to device).                                   |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
 | :file:`merged.hex`                       | The result of merging all :file:`zephyr.hex` files for all images for a core                          | * Programming multi-core application.                                                                     |
-|                                          | in a multi-image build. Used by Nordic Semiconductor's build targets in single-core                   | * Testing DFU procedure with nrfjprog (programming directly to device).                                   |
+|                                          | in a multi-image build. Used by Nordic Semiconductor's board targets in single-core                   | * Testing DFU procedure with nrfjprog (programming directly to device).                                   |
 |                                          | multi-image builds. In multi-core builds, several :file:`merged_<image_name>.hex` fields              |                                                                                                           |
 |                                          | are generated, where *<image-name>* indicates the core.                                               |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`merged_domains.hex`               | The result of merging all :file:`merged.hex` files for all cores or processing environments           | * Programming :ref:`SPE-only <app_boards_spe_nspe>` and multi-core build targets.                         |
+| :file:`merged_domains.hex`               | The result of merging all :file:`merged.hex` files for all cores or processing environments           | * Programming :ref:`SPE-only <app_boards_spe_nspe>` and multi-core board targets.                         |
 |                                          | (:file:`merged.hex` for the application core and :file:`merged.hex` or :file:`zephyr.hex`             | * Testing DFU procedure with nrfjprog (programming directly to device).                                   |
 |                                          | for the network core).                                                                                |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`tfm_s.hex`                        | Secure firmware image created by the TF-M build system in the background of the Zephyr build.         | Programming :ref:`SPE-only <app_boards_spe_nspe>` and multi-core build targets.                           |
+| :file:`tfm_s.hex`                        | Secure firmware image created by the TF-M build system in the background of the Zephyr build.         | Programming :ref:`SPE-only <app_boards_spe_nspe>` and multi-core board targets.                           |
 |                                          | It is used together with the :file:`zephyr.hex` file, which is intended for the Non-Secure            |                                                                                                           |
 |                                          | Processing Environment (NSPE). Located in :file:`build/tfm/bin`.                                      |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`app_update.bin`                   | Application core update file used to create :file:`dfu_application.zip` for multi-core DFU.           | DFU process for single-image build targets and the application core                                       |
-|                                          | Can also be used standalone for a single-image DFU.                                                   | of the multi-core build targets.                                                                          |
+| :file:`app_update.bin`                   | Application core update file used to create :file:`dfu_application.zip` for multi-core DFU.           | DFU process for single-image board targets and the application core                                       |
+|                                          | Can also be used standalone for a single-image DFU.                                                   | of the multi-core board targets.                                                                          |
 |                                          | Contains the signed version of the application.                                                       |                                                                                                           |
 |                                          | This file is transferred in the real-life update procedure, as opposed to HEX files                   |                                                                                                           |
 |                                          | that are transferred with nrfjprog when emulating an update procedure.                                |                                                                                                           |
 |                                          | :ref:`Compatible with MCUboot <mcuboot:mcuboot_ncs>`.                                                 |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`app_signed.hex`                   | HEX file variant of the :file:`app_update.bin` file.                                                  | Programming single-image build targets and the application core                                           |
-|                                          | Can also be used standalone for a single-image DFU.                                                   | of the multi-core build targets.                                                                          |
+| :file:`app_signed.hex`                   | HEX file variant of the :file:`app_update.bin` file.                                                  | Programming single-image board targets and the application core                                           |
+|                                          | Can also be used standalone for a single-image DFU.                                                   | of the multi-core board targets.                                                                          |
 |                                          | Contains the signed version of the application.                                                       |                                                                                                           |
 |                                          | :ref:`Compatible with MCUboot <mcuboot:mcuboot_ncs>`.                                                 |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app_update.bin` | Secondary slot variant of the :file:`app_update.bin` file.                                            | DFU process for single-core build targets.                                                                |
+| :file:`mcuboot_secondary_app_update.bin` | Secondary slot variant of the :file:`app_update.bin` file.                                            | DFU process for single-core board targets.                                                                |
 |                                          | :ref:`Compatible with MCUboot <mcuboot:mcuboot_ncs>` in the :doc:`direct-xip mode <mcuboot:design>`.  |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app_signed.hex` | Secondary slot variant of the :file:`app_signed.hex` file.                                            | Programming single-core build targets.                                                                    |
+| :file:`mcuboot_secondary_app_signed.hex` | Secondary slot variant of the :file:`app_signed.hex` file.                                            | Programming single-core board targets.                                                                    |
 |                                          | :ref:`Compatible with MCUboot <mcuboot:mcuboot_ncs>` in the :doc:`direct-xip mode <mcuboot:design>`.  |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-| :file:`net_core_app_update.bin`          | Network core update file used to create :file:`dfu_application.zip`.                                  | DFU process for the network core of multi-core build targets.                                             |
+| :file:`net_core_app_update.bin`          | Network core update file used to create :file:`dfu_application.zip`.                                  | DFU process for the network core of multi-core board targets.                                             |
 |                                          | This file is transferred in the real-life update procedure, as opposed to HEX files                   |                                                                                                           |
 |                                          | that are transferred with nrfjprog when emulating an update procedure.                                |                                                                                                           |
 +------------------------------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+
@@ -147,6 +151,29 @@ MCUboot output build files
 | :file:`mcuboot_secondary_app_to_sign.bin`                        | Secondary slot variant of the :file:`app_to_sign.bin` file intended for use when MCUboot is in the :doc:`direct-xip mode <mcuboot:design>`.                                                                                                                                              |
 |                                                                  | Created when the :kconfig:option:`CONFIG_BOOT_BUILD_DIRECT_XIP_VARIANT` Kconfig option is enabled.                                                                                                                                                                                       |
 +------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+.. _app_build_output_files_suit_dfu:
+
+SUIT output build files
+***********************
+
+The following table lists secondary build files that can be generated when building firmware update packages using the :ref:`Software Updates for Internet of Things (SUIT) DFU procedure <ug_nrf54h20_suit_intro>`.
+
++-------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| File                                            | Description                                                                                                                                                            |
++=================================================+========================================================================================================================================================================+
+| :file:`root_with_binary_nordic_top.yaml.jinja2` | SUIT Manifest templates automatically placed in the sample directory after the first build of the :ref:`nrf54h_suit_sample` sample.                                    |
+|                                                 | They serve as the basis for generating the specific SUIT envelopes tailored to the requirements of different domains within the device (root, application, and radio). |
+| :file:`app_envelope.yaml.jinja2`                |                                                                                                                                                                        |
+|                                                 |                                                                                                                                                                        |
+| :file:`rad_envelope.yaml.jinja2`                |                                                                                                                                                                        |
++-------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`root.suit`                               | Binary SUIT envelopes that are generated from their respective YAML manifest templates during the build process of the :ref:`nrf54h_suit_sample` sample.               |
+|                                                 | The :file:`root.suit` contains embedded application core manifest (:file:`application.suit`) and radio core manifest (:file:`radio.suit`).                             |
+| :file:`application.suit`                        | The :file:`radio.suit` is not generated for the UART version of the :ref:`nrf54h_suit_sample`.                                                                         |
+|                                                 | These files can be found in the :file:`build/zephyr` directory after building the sample.                                                                              |
+| :file:`radio.suit`                              |                                                                                                                                                                        |
++-------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. _app_build_output_files_other:
 

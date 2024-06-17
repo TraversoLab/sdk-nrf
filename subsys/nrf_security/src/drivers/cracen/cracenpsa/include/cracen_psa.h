@@ -14,6 +14,7 @@
 #include <cracen/mem_helpers.h>
 #include "cracen_psa_primitives.h"
 #include "cracen_psa_kmu.h"
+#include "cracen_psa_key_ids.h"
 #include "sxsymcrypt/keyref.h"
 
 #ifdef __NRF_TFM__
@@ -23,16 +24,6 @@
 /**
  * See "PSA Cryptography API" for documentation.
  */
-
-#define CRACEN_BUILTIN_IDENTITY_KEY_ID ((psa_key_id_t)0x7ffff001)
-#define CRACEN_BUILTIN_MKEK_ID	       ((psa_key_id_t)0x7ffff002)
-#define CRACEN_BUILTIN_MEXT_ID	       ((psa_key_id_t)0x7ffff003)
-
-#define CRACEN_IDENTITY_KEY_SLOT_NUMBER 0
-#define CRACEN_MKEK_SLOT_NUMBER		1
-#define CRACEN_MEXT_SLOT_NUMBER		2
-
-#define PSA_KEY_LOCATION_CRACEN (PSA_KEY_LOCATION_VENDOR_FLAG | ('N' << 8))
 
 psa_status_t cracen_sign_message(const psa_key_attributes_t *attributes, const uint8_t *key_buffer,
 				 size_t key_buffer_size, psa_algorithm_t alg, const uint8_t *input,
@@ -213,11 +204,6 @@ psa_status_t cracen_key_derivation_input_bytes(cracen_key_derivation_operation_t
 
 psa_status_t cracen_key_derivation_input_integer(cracen_key_derivation_operation_t *operation,
 						 psa_key_derivation_step_t step, uint64_t value);
-
-psa_status_t cracen_key_derivation_input_key(cracen_key_derivation_operation_t *operation,
-					     psa_key_derivation_step_t step,
-					     const psa_key_attributes_t *attributes,
-					     const uint8_t *key_buffer, size_t key_buffer_size);
 
 psa_status_t cracen_key_derivation_output_bytes(cracen_key_derivation_operation_t *operation,
 						uint8_t *output, size_t output_length);

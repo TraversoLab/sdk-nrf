@@ -1,5 +1,4 @@
 /*
- *  Copyright (c) 2019-2021 Silex Insight
  *  Copyright (c) 2023 Nordic Semiconductor ASA
  *
  *  SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
@@ -79,6 +78,7 @@ struct sxkeyref {
 	int (*prepare_key)(const uint8_t *arg0);
 	int (*clean_key)(const uint8_t *arg0);
 	const uint8_t *user_data;
+	uint32_t owner_id;
 };
 
 /** An AEAD operation

@@ -72,7 +72,7 @@ See the following table for more details:
      - Incomplete verification
      - Not applicable.
 
-For the certification status of different features in a specific SoC, see its Compatibility Matrix in the `Nordic Semiconductor Infocenter`_.
+For the certification status of different features in a specific SoC, see its Compatibility Matrix in the `Nordic Semiconductor TechDocs`_.
 
 .. _api_deprecation:
 
@@ -171,6 +171,7 @@ Protocol support
 The following table indicates the software maturity levels of the support for each :ref:`protocol <protocols>`:
 
 .. sml-table:: top_level
+   :insert-values: [("Bluetooth","nRF54L15","Experimental"), ("Bluetooth Mesh","nRF54L15","-"), ("Matter","nRF54L15","Experimental"), ("Sidewalk","nRF54L15","Experimental"), ("Thread","nRF54L15","Experimental"), ("Wi-Fi","nRF54L15","Experimental")]
 
 Amazon Sidewalk features support
 ********************************
@@ -227,6 +228,160 @@ The following table indicates the software maturity levels of the support for ea
 .. toggle::
 
   .. sml-table:: wifi
+
+Ecosystem support
+*****************
+
+The following sections contain the tables indicating the software maturity levels of the support for the following ecosystems:
+
+* Google Fast Pair
+
+Google Fast Pair
+================
+
+The following table indicates the software maturity levels of the support for Google Fast Pair use cases integrated in the |NCS|:
+
+.. toggle::
+
+   .. _software_maturity_fast_pair_use_case:
+
+   .. list-table:: Google Fast Pair use case support
+      :header-rows: 1
+      :align: center
+      :widths: auto
+
+      * - Use case
+        - |NCS| sample demonstration
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Input device**
+        - :ref:`fast_pair_input_device`
+        - --
+        - --
+        - --
+        - Experimental
+        - Experimental
+        - Experimental
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+      * - **Locator tag**
+        - :ref:`fast_pair_locator_tag`
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+
+The following table indicates the software maturity levels of the support for each Fast Pair feature:
+
+.. toggle::
+
+   .. _software_maturity_fast_pair_feature:
+
+   .. list-table:: Google Fast Pair feature support
+      :header-rows: 1
+      :align: center
+      :widths: auto
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Initial pairing**
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+      * - **Subsequent pairing**
+        - --
+        - --
+        - --
+        - Experimental
+        - Experimental
+        - Experimental
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+      * - **Battery Notification extension**
+        - --
+        - --
+        - --
+        - Experimental
+        - Experimental
+        - Experimental
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+      * - **Personalized Name extension**
+        - --
+        - --
+        - --
+        - Experimental
+        - Experimental
+        - Experimental
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+      * - **Find My Device Network extension**
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - --
+        - Experimental
+        - --
+        - --
+        - --
 
 Security Feature Support
 ************************
