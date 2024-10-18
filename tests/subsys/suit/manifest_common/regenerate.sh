@@ -29,6 +29,22 @@ if [ ! -f key_private.pem ]; then
   generated_files+=("\tprivate key:\t\t$PWD/key_private.pem")
   generated_files+=("\tpublic key:\t\t$PWD/key_public.pem")
 fi
+
+    # 0x4000AA00: Path(__file__).parent / "key_private_OEM_ROOT_GEN1.pem",
+    # 0x40022100: Path(__file__).parent / "key_private_APPLICATION_GEN1.pem",
+    # 0x40032100: Path(__file__).parent / "key_private_RADIO_GEN1.pem",
+if [ ! -f key_private_OEM_ROOT_GEN1.pem ]; then
+  cp key_private.pem key_private_OEM_ROOT_GEN1.pem
+fi
+
+if [ ! -f key_private_APPLICATION_GEN1.pem ]; then
+  cp key_private.pem key_private_APPLICATION_GEN1.pem
+fi
+
+if [ ! -f key_private_RADIO_GEN1.pem ]; then
+  cp key_private.pem key_private_RADIO_GEN1.pem
+fi
+
 if [ ! -f key_public.c ]; then
   echo "Generating public key as C source file..."
   suit-generator convert --input-file key_private.pem --output-file key_public.c
@@ -48,6 +64,7 @@ zcbor convert \
   -c ${SUIT_PROCESSOR_DIR}/cddl/manifest.cddl \
   -c ${SUIT_PROCESSOR_DIR}/cddl/trust_domains.cddl \
   -c ${SUIT_PROCESSOR_DIR}/cddl/update_management.cddl \
+  -c ${SUIT_PROCESSOR_DIR}/cddl/firmware_encryption.cddl \
   -i ./sample_signed.suit \
   --input-as cbor \
   -t SUIT_Envelope_Tagged \

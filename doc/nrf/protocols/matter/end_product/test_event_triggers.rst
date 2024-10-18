@@ -100,11 +100,61 @@ The following table lists the available triggers and their activation codes:
     - ``0xFFFFFFFF60000000``
     - No additional value supported.
   * - OTA query
-    - :kconfig:option:`CONFIG_CHIP_OTA_REQUESTOR` = ``y``, and :kconfig:option:`SB_CONFIG_MATTER_OTA` = ``y``.
+    - :kconfig:option:`CONFIG_CHIP_OTA_REQUESTOR` = ``y``, and ``SB_CONFIG_MATTER_OTA`` = ``y``.
     - Trigger an OTA firmware update.
     - ``0x002a000000000100`` - ``0x01000000000001FF``
     - The range of ``0x00`` - ``0xFF`` is the fabric index value.
       The maximum fabric index value depends on the current device's settings.
+  * - Smoke CO alarm - Smoke critical alarm
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger a smoke alarm with critical severity level
+    - ``0x005c00000000009c``
+    - No additional value supported.
+  * - Smoke CO alarm - Smoke alarm clean
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger an action that ceases smoke alarm
+    - ``0x005c0000000000a0``
+    - No additional value supported.
+  * - Smoke CO alarm - CO critical alarm
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger a CO alarm with critical severity level
+    - ``0x005c00000000009d``
+    - No additional value supported.
+  * - Smoke CO alarm - CO alarm clean
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger an action that ceases CO alarm
+    - ``0x005c0000000000a1``
+    - No additional value supported.
+  * - Smoke CO alarm - battery low level alarm
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger a battery low level alarm
+    - ``0x005c00000000009e``
+    - No additional value supported.
+  * - Smoke CO alarm - battery low level alarm clean
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger an action that ceases battery low level alarm
+    - ``0x005c0000000000a5``
+    - No additional value supported.
+  * - Smoke CO alarm - hardware fault alarm
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger a hardware fault alarm
+    - ``0x005c000000000093``
+    - No additional value supported.
+  * - Smoke CO alarm - hardware fault alarm clean
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger an action that ceases hardware fault alarm
+    - ``0x005c0000000000a3``
+    - No additional value supported.
+  * - Smoke CO alarm - end of service alarm
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger a end of service alarm
+    - ``0x005c00000000009a``
+    - No additional value supported.
+  * - Smoke CO alarm - end of service alarm clean
+    - Only for :ref:`Matter Smoke CO Alarm <matter_smoke_co_alarm_sample>`
+    - Trigger an action that ceases end of service alarm
+    - ``0x005c0000000000aa``
+    - No additional value supported.
   * - Door lock jammed
     - :kconfig:option:`CONFIG_CHIP_DEVICE_PRODUCT_ID` = ``32774``
     - Simulate the jammed lock state.
@@ -125,10 +175,10 @@ You cannot set the enable key to a specific value using factory data unless the 
 If it is not set, the default value ``00112233445566778899AABBCCDDEEFF`` will be used.
 For secure operation, you need to ensure that the enable key is unique for all of your devices.
 
-To specify the enable key through the build system, enable the :kconfig:option:`SB_CONFIG_MATTER_FACTORY_DATA_GENERATE` Kconfig option by setting it to ``y``.
+To specify the enable key through the build system, enable the ``SB_CONFIG_MATTER_FACTORY_DATA_GENERATE`` Kconfig option by setting it to ``y``.
 Then, set the :kconfig:option:`CONFIG_CHIP_DEVICE_ENABLE_KEY` Kconfig option to a 32-byte hexadecimal string value.
 
-If :kconfig:option:`SB_CONFIG_MATTER_FACTORY_DATA_GENERATE` is set to ``n``, you can follow the :doc:`matter:nrfconnect_factory_data_configuration` guide in the Matter documentation to generate the factory data set with the specific enable key value.
+If ``SB_CONFIG_MATTER_FACTORY_DATA_GENERATE`` is set to ``n``, you can follow the :doc:`matter:nrfconnect_factory_data_configuration` guide in the Matter documentation to generate the factory data set with the specific enable key value.
 
 If you do not use the |NCS| Matter common module, you need to read the enable key value manually from the factory data set and provide it to the ``TestEventTrigger`` class.
 

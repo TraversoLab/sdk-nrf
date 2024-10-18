@@ -9,6 +9,7 @@
 #include <nrf_modem_at.h>
 #include <modem/modem_info.h>
 #include <zephyr/settings/settings.h>
+#include <helpers/nrfx_reset_reason.h>
 #include <net/nrf_cloud.h>
 #include <net/nrf_cloud_rest.h>
 #include <net/nrf_cloud_log.h>
@@ -247,7 +248,7 @@ static bool cred_check(struct nrf_cloud_credentials_status *const cs)
 	 *  - a CA for the TLS connections
 	 *  - a private key to sign the JWT
 	 */
-	return (cs->ca && cs->prv_key);
+	return (cs->ca && cs->ca_aws && cs->prv_key);
 }
 
 static void await_credentials(void)
@@ -341,7 +342,7 @@ static void send_message_on_button(void)
 
 	/* Send off a JSON message about the button press */
 	/* This matches the nRF Cloud-defined schema for a "BUTTON" device message */
-	rest_ctx.keep_alive = true;
+	rest_ctx.keep_alive = IS_ENABLED(CONFIG_REST_DEVICE_MESSAGE_KEEP_ALIVE);
 	(void)send_message("{\"appId\":\"BUTTON\", \"messageType\":\"DATA\", \"data\":\"1\"}");
 	rest_ctx.keep_alive = false;
 	(void)nrf_cloud_rest_log_send(&rest_ctx, device_id, LOG_LEVEL_DBG,
@@ -454,8 +455,6 @@ static int setup_connection(void)
 		return err;
 	}
 
-	LOG_INF("Device ID: %s", device_id);
-
 	/* Connect to LTE */
 	err = connect_to_lte();
 	if (err) {
@@ -548,9 +547,51 @@ static int init(void)
 	return 0;
 }
 
+static void print_reset_reason(void)
+{
+	uint32_t reset_reason;
+
+	reset_reason = nrfx_reset_reason_get();
+	LOG_INF("Reset reason: 0x%x", reset_reason);
+}
+
+static void report_startup(void)
+{
+	int err;
+
+	/* Set the keep alive flag to true;
+	 * connection will remain open to allow for multiple REST calls
+	 */
+	rest_ctx.keep_alive = true;
+
+	if (IS_ENABLED(CONFIG_SEND_ONLINE_ALERT)) {
+		uint32_t reset_reason;
+
+		reset_reason = nrfx_reset_reason_get();
+		nrfx_reset_reason_clear(reset_reason);
+
+		err = nrf_cloud_rest_alert_send(&rest_ctx, device_id,
+						ALERT_TYPE_DEVICE_NOW_ONLINE,
+						reset_reason, NULL);
+		if (err) {
+			LOG_ERR("Error sending alert to cloud: %d", err);
+		}
+	}
+
+	err = nrf_cloud_rest_log_send(&rest_ctx, device_id, LOG_LEVEL_INF,
+				      SAMPLE_SIGNON_FMT,
+				      CONFIG_REST_DEVICE_MESSAGE_SAMPLE_VERSION);
+
+	if (err) {
+		LOG_ERR("Error sending direct log to cloud: %d", err);
+	}
+}
+
 static int setup(void)
 {
 	int err;
+
+	print_reset_reason();
 
 	/* Initialize libraries and hardware */
 	err = init();
@@ -619,24 +660,8 @@ int main(void)
 		return 0;
 	}
 
-	/* Set the keep alive flag to true;
-	 * connection will remain open to allow for multiple REST calls
-	 */
-	rest_ctx.keep_alive = true;
-	err = nrf_cloud_rest_alert_send(&rest_ctx, device_id,
-					ALERT_TYPE_DEVICE_NOW_ONLINE, 0, NULL);
-
-	if (err) {
-		LOG_ERR("Error sending alert to cloud: %d", err);
-	}
-
-	err = nrf_cloud_rest_log_send(&rest_ctx, device_id, LOG_LEVEL_INF,
-				      SAMPLE_SIGNON_FMT,
-				      CONFIG_REST_DEVICE_MESSAGE_SAMPLE_VERSION);
-
-	if (err) {
-		LOG_ERR("Error sending direct log to cloud: %d", err);
-	}
+	/* Send alert (if enabled) and log message to the cloud. */
+	report_startup();
 
 	/* Set the keep alive flag to false; connection will be closed after the next REST call */
 	rest_ctx.keep_alive = false;

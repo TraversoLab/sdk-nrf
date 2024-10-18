@@ -93,6 +93,10 @@ enum nrf_cloud_evt_type {
 	NRF_CLOUD_EVT_READY,
 	/** The device received non-specific data from the cloud. */
 	NRF_CLOUD_EVT_RX_DATA_GENERAL,
+	/** The device received "appID" : "DEVICE", "messageType" : "DISCON",
+	 *  indicating that the device was removed from its nRF Cloud account.
+	 */
+	NRF_CLOUD_EVT_RX_DATA_DISCON,
 	/** The device received location data from the cloud
 	 *  and no response callback was registered.
 	 */
@@ -108,7 +112,7 @@ enum nrf_cloud_evt_type {
 	 */
 	NRF_CLOUD_EVT_TRANSPORT_DISCONNECTED,
 	/** A FOTA update has started.
-	 * This event is only sent if @kconfig{CONFIG_NRF_CLOUD_FOTA_AUTO_START_JOB} is enabled.
+	 *  This event is only sent if @kconfig{CONFIG_NRF_CLOUD_FOTA_AUTO_START_JOB} is enabled.
 	 */
 	NRF_CLOUD_EVT_FOTA_START,
 	/** The device should be restarted to apply a firmware upgrade */
@@ -120,9 +124,9 @@ enum nrf_cloud_evt_type {
 	 */
 	NRF_CLOUD_EVT_TRANSPORT_CONNECT_ERROR,
 	/** FOTA update job information has been received.
-	 * When ready, the application should start the job by
-	 * calling @ref nrf_cloud_fota_job_start.
-	 * This event is only sent if @kconfig{CONFIG_NRF_CLOUD_FOTA_AUTO_START_JOB} is disabled.
+	 *  When ready, the application should start the job by
+	 *  calling @ref nrf_cloud_fota_job_start.
+	 *  This event is only sent if @kconfig{CONFIG_NRF_CLOUD_FOTA_AUTO_START_JOB} is disabled.
 	 */
 	NRF_CLOUD_EVT_FOTA_JOB_AVAILABLE,
 	/** An error occurred. The status field in the event struct will
@@ -273,10 +277,14 @@ enum nrf_cloud_topic_type {
 	 *  nrf_cloud_codec.h - struct nrf_cloud_bin_hdr.  A unique format value
 	 *  should be included to distinguish this data from binary logging.
 	 */
-	NRF_CLOUD_TOPIC_BIN
+	NRF_CLOUD_TOPIC_BIN,
+#if defined(CONFIG_NRF_CLOUD_MQTT_SHADOW_TRANSFORMS)
+	/** Endpoint used to request device shadow data using a transform (JSONata expression). */
+	NRF_CLOUD_TOPIC_STATE_TF,
+#endif
 };
 
-/** @brief FOTA status reported to nRF Cloud. */
+/** @brief FOTA status reported to nRF Cloud and notified in @ref nrf_cloud_fota_poll_handler_t */
 enum nrf_cloud_fota_status {
 	NRF_CLOUD_FOTA_QUEUED = 0,
 	NRF_CLOUD_FOTA_IN_PROGRESS = 1,
@@ -306,6 +314,8 @@ enum nrf_cloud_fota_type {
 
 	/** Full modem update */
 	NRF_CLOUD_FOTA_MODEM_FULL = 5,
+	/** Auxiliary device updated using SMP */
+	NRF_CLOUD_FOTA_SMP = 6,
 
 	NRF_CLOUD_FOTA_TYPE__INVALID
 };
@@ -434,12 +444,19 @@ struct nrf_cloud_svc_info_fota {
 	uint8_t application:1;
 	/** Flag to indicate if full modem image updates are supported */
 	uint8_t modem_full:1;
+	/** Flag to indicate if smp updates are supported */
+	uint8_t smp:1;
 
 	/** Reserved for future use */
-	uint8_t _rsvd:4;
+	uint8_t _rsvd:3;
 };
 
-/** @brief DEPRECATED - No longer used by nRF Cloud */
+/** @brief DEPRECATED - No longer used by nRF Cloud
+ * The device data cards on the nRF Cloud portal automatically appear when the device
+ * sends messages with the proper schema:
+ * https://github.com/nRFCloud/application-protocols/tree/v1/schemas/deviceToCloud
+ * Custom cards are generated for appIds that are not present in the schema.
+ */
 struct nrf_cloud_svc_info_ui {
 	/* Items with UI support on nRF Cloud */
 	/** Temperature */
@@ -505,7 +522,9 @@ struct nrf_cloud_svc_info {
 	/** Specify FOTA components to enable, set to NULL to remove the FOTA entry */
 	struct nrf_cloud_svc_info_fota *fota;
 
-	/** DEPRECATED - nRF Cloud no longer requires the device to set UI values in the shadow */
+	/** DEPRECATED - nRF Cloud no longer requires the device to set UI values in the shadow.
+	 * See @ref nrf_cloud_svc_info_ui for more information.
+	 */
 	struct nrf_cloud_svc_info_ui *ui;
 };
 
@@ -563,9 +582,12 @@ struct nrf_cloud_gnss_pvt {
 struct nrf_cloud_credentials_status {
 	/* Configured sec_tag for nRF Cloud */
 	uint32_t sec_tag;
+	size_t ca_size;
 
 	/* Flags to indicate if the specified credentials exist */
 	uint8_t ca:1;
+	uint8_t ca_coap:1;
+	uint8_t ca_aws:1;
 	uint8_t client_cert:1;
 	uint8_t prv_key:1;
 };
@@ -575,7 +597,7 @@ struct nrf_cloud_credentials_status {
 #endif
 /** @brief NMEA data */
 struct nrf_cloud_gnss_nmea {
-	/** NULL-terminated NMEA sentence. Supported types are GPGGA, GPGLL, GPRMC.
+	/** Null-terminated NMEA sentence. Supported types are GPGGA, GPGLL, GPRMC.
 	 * Max string length is NRF_MODEM_GNSS_NMEA_MAX_LEN - 1
 	 */
 	const char *sentence;
@@ -620,10 +642,11 @@ struct nrf_cloud_ctrl_data {
 	 *  If false, alerts will be suppressed.
 	 */
 	bool alerts_enabled;
-	/** If 0, the nrf_cloud library logging backend will be disabled.
-	 *  If values from 1 to 4, this level and any lower levels will
-	 *  be sent to the cloud. Level 1 is most urgent (LOG_ERR),
-	 *  level 4 least (LOG_DBG).
+	/** If 0: None - the nrf_cloud library logging backend is disabled.
+	 *     4: LOG_DBG (least urgent) and all levels below are sent to the cloud.
+	 *     3: LOG_INF and all levels below are sent to the cloud.
+	 *     2: LOG_WRN and all levels below are sent to the cloud.
+	 *     1: only LOG_ERR (most urgent) is sent to the cloud.
 	 */
 	int log_level;
 };
@@ -640,7 +663,7 @@ typedef void (*nrf_cloud_event_handler_t)(const struct nrf_cloud_evt *evt);
 struct nrf_cloud_init_param {
 	/** Event handler that is registered with the module. */
 	nrf_cloud_event_handler_t event_handler;
-	/** NULL-terminated MQTT client ID string.
+	/** Null-terminated MQTT client ID string.
 	 * Must not exceed NRF_CLOUD_CLIENT_ID_MAX_LEN.
 	 * Must be set if NRF_CLOUD_CLIENT_ID_SRC_RUNTIME
 	 * is enabled; otherwise, NULL.
@@ -660,6 +683,12 @@ struct nrf_cloud_init_param {
 	 * @kconfig{CONFIG_NRF_CLOUD_SEND_DEVICE_STATUS} is enabled.
 	 */
 	const char *application_version;
+
+	/** Callback of type @ref dfu_target_reset_cb_t for resetting the SMP device to enter
+	 * MCUboot recovery mode.
+	 * Used if @kconfig{CONFIG_NRF_CLOUD_FOTA_SMP} is enabled.
+	 */
+	void *smp_reset_cb;
 };
 
 /**
@@ -696,6 +725,77 @@ int nrf_cloud_init(const struct nrf_cloud_init_param *param);
  * @return A negative value indicates an error.
  */
 int nrf_cloud_uninit(void);
+
+/**
+ * @brief Print details about cloud connection.
+ *
+ * If @kconfig{CONFIG_NRF_CLOUD_VERBOSE_DETAILS} is not enabled,
+ * only print the device id. If enabled, also print the protocol,
+ * sec tag, and host name.
+ *
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_print_details(void);
+
+/**
+ * @brief Print details about cloud connection after connected.
+ *
+ * Some information is only available after the device is connected.
+ * When using MQTT, the tenant will be printed.
+ *
+ * When using CoAP and REST, there is no further information to print.
+ *
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_print_cloud_details(void);
+
+/**
+ * @brief Retrieve the IMEI.
+ *
+ * If @kconfig{CONFIG_NRF_MODEM_LIB} is not enabled, returns an error.
+ *
+ * @param[in,out] buf A pointer in which to store the IMEI string.
+ * @param[in]  buf_sz The size of the buffer. It should be at least 22
+ *                    to include the 15 bytes for the IMEI and 7 for AT
+ *                    command overhead.
+ *
+ * @retval 0        If successful.
+ * @retval -ENOTSUP If the modem library is not available.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_get_imei(char *buf, size_t buf_sz);
+
+/**
+ * @brief Retrieve the device's UUID.
+ *
+ * If @kconfig{CONFIG_NRF_MODEM_LIB} is not enabled, returns an error.
+ *
+ * @param[in,out] buf A pointer in which to store the UUID string.
+ * @param[in]  buf_sz The size of the buffer. It should be at least
+ *                    NRF_DEVICE_UUID_STR_LEN + 1 bytes in size.
+ *
+ * @retval 0        If successful.
+ * @retval -ENOTSUP If the modem library is not available.
+ * @retval -EINVAL  buf cannot be NULL.
+ * @retval -ENOMEM  buf_sz was too small.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_get_uuid(char *buf, size_t buf_sz);
+
+/**
+ * @brief Retrieve the Modem firmware version.
+ *
+ * If @kconfig{CONFIG_NRF_MODEM_LIB} is not enabled, returns an error.
+ *
+ * @param[in,out] buf A pointer in which to store the mfw string.
+ * @param[in]  buf_sz The size of the buffer. The required size could
+ *                    be up to 2048, but 32 should be sufficient.
+ *
+ * @retval 0        If successful.
+ * @retval -ENOTSUP If the modem library is not available.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_get_modem_fw(char *buf, size_t buf_sz);
 
 /**
  * @brief Connect to the cloud.
@@ -783,6 +883,26 @@ int nrf_cloud_send(const struct nrf_cloud_tx_data *msg);
 int nrf_cloud_obj_shadow_update(struct nrf_cloud_obj *const shadow_obj);
 
 /**
+ * @brief Request shadow data over MQTT using a JSONata expression.
+ *        For example, to request the reported device info section, the transform would be:
+ *        "state.reported.device.deviceInfo".
+ *        The application will receive response data in an
+ *        @ref NRF_CLOUD_EVT_RX_DATA_SHADOW event.
+ *        The @ref nrf_cloud_obj_shadow_data will be of the type @ref NRF_CLOUD_OBJ_SHADOW_TYPE_TF.
+ *
+ * @param transform The JSONata expression.
+ * @param max_response_len The maximum allowable length of the cloud's response.
+ *                         Set to 0 to use the default length:
+ *                         @ref NRF_CLOUD_TRANSFORM_MAX_RESPONSE_LEN.
+ *
+ * @retval 0        Request was sent successfully.
+ * @retval -ENOTSUP Error; @kconfig{CONFIG_NRF_CLOUD_MQTT_SHADOW_TRANSFORMS} is not enabled.
+ * @retval -EINVAL  Error; invalid parameter.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_shadow_transform_request(char const *const transform, const size_t max_response_len);
+
+/**
  * @brief Disconnect from the cloud.
  *
  * This API may be called any time after receiving the
@@ -822,13 +942,32 @@ int nrf_cloud_modem_fota_completed(const bool fota_success);
 /**
  * @brief Retrieve the current device ID.
  *
- * @param[in,out] id_buf Buffer to receive the device ID.
- * @param[in] id_len     Size of buffer (NRF_CLOUD_CLIENT_ID_MAX_LEN).
+ * @param[in,out] id_buf Buffer to receive the device ID as a null-terminated string.
+ * @param[in] id_buf_sz  Size of buffer, maximum size is NRF_CLOUD_CLIENT_ID_MAX_LEN + 1.
+ *
+ * @retval 0         If successful.
+ * @retval -EMSGSIZE The provided buffer is too small.
+ * @retval -EIO      The client ID could not be initialized.
+ * @retval -ENXIO    The Kconfig option @kconfig{CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME} is enabled
+ *                   but the runtime client ID has not been set.
+ *                   See @ref nrf_cloud_client_id_runtime_set.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_client_id_get(char *id_buf, size_t id_buf_sz);
+
+/**
+ * @brief Set the device ID at runtime.
+ *        Requires @kconfig{CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME} to be enabled.
+ *
+ * @note This function does not perform any management of the device's connection to nRF Cloud.
+ *
+ * @param[in] client_id Null-terminated device ID string.
+ *                      Max string length is NRF_CLOUD_CLIENT_ID_MAX_LEN.
  *
  * @retval 0 If successful.
  * @return A negative value indicates an error.
  */
-int nrf_cloud_client_id_get(char *id_buf, size_t id_len);
+int nrf_cloud_client_id_runtime_set(const char *const client_id);
 
 /**
  * @brief Retrieve the current customer tenant ID.
@@ -997,6 +1136,52 @@ bool nrf_cloud_fota_is_type_enabled(const enum nrf_cloud_fota_type type);
 int nrf_cloud_fota_job_start(void);
 
 /**
+ * @brief Initialize the SMP client.
+ *        Called automatically if @kconfig{CONFIG_NRF_CLOUD_FOTA} or
+ *        @kconfig{CONFIG_NRF_CLOUD_FOTA_POLL} is enabled.
+ *
+ * @param smp_reset_cb Callback of type @ref dfu_target_reset_cb_t for resetting the SMP device to
+ *                     enter MCUboot recovery mode.
+ *
+ * @retval 0        SMP client successfully initialized.
+ * @retval -ENOTSUP Error; @kconfig{CONFIG_NRF_CLOUD_FOTA_SMP} is not enabled.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_fota_smp_client_init(const void *smp_reset_cb);
+
+/**
+ * @brief Install a downloaded SMP FOTA job.
+ *        Called automatically if @kconfig{CONFIG_NRF_CLOUD_FOTA} is enabled (MQTT FOTA).
+ *
+ * @retval 0        SMP update installed successfully.
+ * @retval -ENOTSUP Error; @kconfig{CONFIG_NRF_CLOUD_FOTA_SMP} is not enabled.
+ * @retval -EIO     Error; failed to schedule image installation.
+ * @retval -EPROTO  Error; failed to reset SMP device.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_fota_smp_install(void);
+
+/**
+ * @brief Read the image info from the SMP device to obtain the current version.
+ *
+ * @retval 0        Success; call @ref nrf_cloud_fota_smp_version_get to get the version string.
+ * @retval -ENOBUFS Error; internal buffer is too small to hold version string.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_fota_smp_version_read(void);
+
+/**
+ * @brief Get the current version string of the SMP device.
+ *        An empty string will be returned if @ref nrf_cloud_fota_smp_version_read has
+ *        not been successfully called.
+ *
+ * @retval 0        Success.
+ * @retval -ENOBUFS Error; internal buffer is too small to hold version string.
+ * @return A negative value indicates an error.
+ */
+int nrf_cloud_fota_smp_version_get(char **smp_ver_out);
+
+/**
  * @brief Check if credentials exist in the configured location.
  *
  * @param[out] cs Results of credentials check.
@@ -1011,14 +1196,67 @@ int nrf_cloud_credentials_check(struct nrf_cloud_credentials_status *const cs);
 /**
  * @brief Check if the credentials required for connecting to nRF Cloud exist.
  *        The application's configuration is used to determine which credentials
- *        are required.
+ *        are required. Check the size of the root CA certificates installed
+ *        and return an error code if the size of the root CA certificate(s) is not
+ *        appropriate for the configured transport type.
  *
  * @retval 0 Required credentials exist.
  * @retval -EIO Error checking if credentials exists.
  * @retval -ENOTSUP Required credentials do not exist.
+ * @retval -ENOPROTOOPT Size of root CA is not appropriate for the configured transport type.
  * @return A negative value indicates an error.
  */
 int nrf_cloud_credentials_configured_check(void);
+
+/**
+ * @brief Set the sec tag used for nRF Cloud credentials.
+ *        The default sec tag value is @kconfig{CONFIG_NRF_CLOUD_COAP_SEC_TAG} or
+ *        @kconfig{CONFIG_NRF_CLOUD_COAP_SEC_TAG} for CoAP.
+ *
+ * @note This API only needs to be called if the default configured sec tag value is no
+ *       longer applicable. This function does not perform any management of the
+ *       device's connection to nRF Cloud.
+ *       For CoAP, changing this value will change the sec tag used for the DTLS connection only.
+ *       Use @ref nrf_cloud_sec_tag_coap_jwt_set to set the sec tag used for JWT signing.
+ *       For normal operation, the DTLS and JWT sec tags should be the same. They should only
+ *       differ for debugging purposes (network traffic decryption).
+ *
+ * @param sec_tag The sec tag.
+ *
+ */
+void nrf_cloud_sec_tag_set(const sec_tag_t sec_tag);
+
+/**
+ * @brief Get the sec tag used for nRF Cloud credentials.
+ *
+ * @return The sec tag.
+ */
+sec_tag_t nrf_cloud_sec_tag_get(void);
+
+/**
+ * @brief Set the sec tag containing the private key used to sign CoAP JWTs for nRF Cloud
+ *        authentication.
+ *        The default sec tag value is @kconfig{CONFIG_NRF_CLOUD_COAP_JWT_SEC_TAG}.
+ *
+ * @note This API requires @kconfig{CONFIG_NRF_CLOUD_COAP} to be enabled.
+ *       This API only needs to be called if the default configured sec tag value is no
+ *       longer applicable. This function does not perform any management of the
+ *       device's authentication status with nRF Cloud.
+ *
+ * @param sec_tag The sec tag.
+ *
+ */
+void nrf_cloud_sec_tag_coap_jwt_set(const sec_tag_t sec_tag);
+
+/**
+ * @brief Get the sec tag containing the private key used to sign CoAP JWTs for nRF Cloud
+ *        authentication.
+ *
+ * @note This API requires @kconfig{CONFIG_NRF_CLOUD_COAP} to be enabled.
+ *
+ * @return The sec tag.
+ */
+sec_tag_t nrf_cloud_sec_tag_coap_jwt_get(void);
 
 /** @} */
 

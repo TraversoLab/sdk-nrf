@@ -612,7 +612,7 @@ This section provides detailed lists of changes by :ref:`sample <samples>`.
 Bluetooth samples
 -----------------
 
-* Added the :ref:`ble_connection_event_trigger` sample for the proprietary Event Trigger feature.
+* Added the :ref:`ble_event_trigger` sample for the proprietary Event Trigger feature.
 * :ref:`ble_throughput` sample:
 
   * Updated by enabling encryption in the sample.
@@ -845,7 +845,7 @@ Matter samples
 * Disabled the following features:
 
   * :ref:`ug_matter_configuring_read_client` in most Matter samples using the new :kconfig:option:`CONFIG_CHIP_ENABLE_READ_CLIENT` Kconfig option.
-  * WPA supplicant advanced features in all Matter samples using the :kconfig:option:`CONFIG_WPA_SUPP_ADVANCED_FEATURES` Kconfig option.
+  * WPA supplicant advanced features in all Matter samples using the ``CONFIG_WPA_SUPP_ADVANCED_FEATURES`` Kconfig option.
     This saves roughly 25 KB of flash memory for firmware images with Wi-Fi support.
 
 * Added ``matter_shell`` shell commands set to gather the current information about the NVS settings backend, such as current usage, free space, and peak usage value.
@@ -998,7 +998,7 @@ Wi-Fi drivers
 
   * OS agnostic code is moved to |NCS| (``sdk-nrfxlib``) repository.
 
-    * Low-level API documentation is now available on the :ref:`Wi-Fi driver API <nrfxlib:nrf_wifi_api>`.
+    * Low-level API documentation is now available on the ``Wi-Fi driver API``.
 
   * The Wi-Fi interface is now renamed and registered as a devicetree instance.
 
@@ -1101,7 +1101,7 @@ Modem libraries
 
     * The default network mode to :kconfig:option:`CONFIG_LTE_NETWORK_MODE_LTE_M_NBIOT_GPS` from :kconfig:option:`CONFIG_LTE_NETWORK_MODE_LTE_M_GPS`.
     * The default LTE mode preference to :kconfig:option:`CONFIG_LTE_MODE_PREFERENCE_LTE_M_PLMN_PRIO` from :kconfig:option:`CONFIG_LTE_MODE_PREFERENCE_AUTO`.
-    * The :kconfig:option:`CONFIG_LTE_NETWORK_USE_FALLBACK` Kconfig option is deprecated.
+    * The ``CONFIG_LTE_NETWORK_USE_FALLBACK`` Kconfig option is deprecated.
       Use the :kconfig:option:`CONFIG_LTE_NETWORK_MODE_LTE_M_NBIOT` or :kconfig:option:`CONFIG_LTE_NETWORK_MODE_LTE_M_NBIOT_GPS` Kconfig option instead.
       In addition, you can control the priority between LTE-M and NB-IoT using the :kconfig:option:`CONFIG_LTE_MODE_PREFERENCE` Kconfig option.
     * The :c:func:`lte_lc_init` function is deprecated.

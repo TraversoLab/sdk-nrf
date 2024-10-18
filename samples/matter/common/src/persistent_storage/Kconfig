@@ -13,8 +13,16 @@ config NCS_SAMPLE_MATTER_SETTINGS_STORAGE_BACKEND
 
 config NCS_SAMPLE_MATTER_SECURE_STORAGE_BACKEND
 	bool "Secure storage implementation for Matter samples"
-	select TRUSTED_STORAGE
-	select PSA_PROTECTED_STORAGE
+	select TRUSTED_STORAGE if (!PSA_SSF_CRYPTO_CLIENT && !BUILD_WITH_TFM)
+	select PSA_PROTECTED_STORAGE if (!PSA_SSF_CRYPTO_CLIENT && !BUILD_WITH_TFM)
+	help
+	  Enables the secure persistent storage wrapper API that
+	  imitates Zephyr Settings' key-value data format.
+	  If building with CMSE enabled (*/ns), the TF-M
+	  and Secure Domain PSA Protected Storage implementation
+	  is leveraged by default.
+	  If building with CMSE disabled (*/cpuapp),
+	  the Trusted Storage library must be used.
 
 config NCS_SAMPLE_MATTER_STORAGE_MAX_KEY_LEN
 	int "Maximum length (bytes) of the key under which the asset can be stored"
@@ -24,7 +32,7 @@ if NCS_SAMPLE_MATTER_SECURE_STORAGE_BACKEND
 
 config NCS_SAMPLE_MATTER_SECURE_STORAGE_MAX_ENTRY_NUMBER
 	int "Maximum number of entries that can be stored securely"
-	default 30
+	default 64
 
 config NCS_SAMPLE_MATTER_SECURE_STORAGE_PSA_KEY_VALUE_OFFSET
 	hex "The PSA key offset dedicated for Matter application"

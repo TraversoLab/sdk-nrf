@@ -56,6 +56,8 @@ Consider the following when defining partitions for your end product:
   This means that performing DFU from one firmware version to another using different partition sizes may not be possible, and you will not be able to change the partition sizes without reprogramming the device.
   Trying to perform DFU between applications that use incompatible partition sizes can result in unwanted application behavior, depending on which partitions are overlapping.
   In some cases, this may corrupt some partitions; in others, this can lead to a DFU failure.
+* The MCUboot requires its `mcuboot_primary` and `mcuboot_secondary` partitions to be located under offsets being aligned to the 4 kB flash page size.
+  Selecting offset values that are not aligned to 4 kB for these partititions will lead to erase failures, and result in a DFU failure.
 
 Settings partition
 ==================
@@ -63,6 +65,21 @@ Settings partition
 The nRF Connect platform in Matter uses Zephyr's :ref:`zephyr:settings_api` API to provide the storage capabilities to the Matter stack.
 This requires that you define the ``settings_storage`` partition in the flash.
 The recommended minimum size of the partition is 32 kB, but you can reserve even more space if your application uses the storage extensively.
+
+The Zephyr settings storage is implemented by the :ref:`Zephyr NVS (Non-Volatile Storage) <zephyr:nvs_api>` or :ref:`ZMS (Zephyr Memory Storage) <zephyr:zms_api>` backends.
+You can select either backend, and the selection affects several factors, such as the operational performance or memory lifetime.
+To achieve the optimal experience, it is recommended to use:
+
+* NVS backend for the flash-based nRF52 and nRF53 SoC families.
+* ZMS backend for the RRAM- and MRAM-based nRF54 SoC families.
+
+The settings backend uses multiple sectors of 4 kB each, and it must use the appropriate number of sectors to cover the entire settings partition area.
+To configure the number of sectors used by the backend, set the corresponding Kconfig option to the desired value:
+
+* :kconfig:option:`CONFIG_SETTINGS_NVS_SECTOR_COUNT` for the NVS
+* :kconfig:option:`CONFIG_SETTINGS_ZMS_SECTOR_COUNT` for the ZMS
+
+For example, to cover a settings partition of 32 kB in size, you require 8 sectors.
 
 As you can see in :ref:`ug_matter_hw_requirements_layouts`, Matter samples in the |NCS| reserve exactly 32 kB for the ``settings_storage`` partition.
 
@@ -98,7 +115,7 @@ MCUboot uses asymmetric cryptography to validate the authenticity of firmware.
 The public key embedded in the bootloader image is used to validate the signature of a firmware image that is about to be booted.
 If the signature check fails, MCUboot rejects the image and either:
 
-* rolls back to the last valid firmware image if the fallback recovery has not been disabled using the MCUboot's :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY` Kconfig option.
+* rolls back to the last valid firmware image if the fallback recovery has not been disabled using the MCUboot's ``SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY`` Kconfig option.
 * fails to boot.
 
 .. note::
@@ -113,4 +130,4 @@ Downgrade protection
 
 The :ref:`downgrade protection <ug_fw_update_image_versions_mcuboot_downgrade>` mechanism makes it impossible for an attacker to trick a user to install a firmware image older than the currently installed one.
 The attacker might want to do this to reintroduce old security vulnerabilities that have already been fixed in newer firmware revisions.
-You should enable the downgrade protection mechanism if you choose to enable MCUboot's :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY` Kconfig option, which disables the fallback recovery in case of a faulty upgrade.
+You should enable the downgrade protection mechanism if you choose to enable MCUboot's ``SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY`` Kconfig option, which disables the fallback recovery in case of a faulty upgrade.

@@ -12,6 +12,8 @@ config BT_LL_SOFTDEVICE
 	bool "SoftDevice Link Layer"
 	select MPSL
 	select ZERO_LATENCY_IRQS if !SOC_SERIES_BSIM_NRFXX
+	select BT_CTLR_CRYPTO_SUPPORT
+	select BT_CTLR_ENTROPY_SUPPORT
 	select BT_CTLR_LE_ENC_SUPPORT
 	select BT_CTLR_ECDH_SUPPORT
 	select BT_CTLR_EXT_REJ_IND_SUPPORT
@@ -35,11 +37,16 @@ config BT_LL_SOFTDEVICE
 	select BT_CTLR_ADV_ISO_SUPPORT
 	select BT_CTLR_PHY_2M_SUPPORT if HAS_HW_NRF_RADIO_BLE_2M
 	select BT_CTLR_PHY_CODED_SUPPORT if HAS_HW_NRF_RADIO_BLE_CODED
+	select BT_CTLR_CHANNEL_SOUNDING_SUPPORT if HAS_HW_NRF_RADIO_CS
 	select BT_HAS_HCI_VS
 	select BT_CTLR_DF_SUPPORT if HAS_HW_NRF_RADIO_DFE
 	select BT_CTLR_LE_POWER_CONTROL_SUPPORT
+	select BT_CTLR_LE_PATH_LOSS_MONITORING_SUPPORT
+	select BT_CTLR_SUBRATING_SUPPORT
+	select BT_LL_SOFTDEVICE_HEADERS_INCLUDE
 	depends on (SOC_SERIES_BSIM_NRFXX || SOC_SERIES_NRF52X || SOC_COMPATIBLE_NRF5340_CPUNET ||\
 			    SOC_NRF54H20_CPURAD || SOC_SERIES_NRF54LX)
+	depends on DT_HAS_NORDIC_BT_HCI_SDC_ENABLED
 	help
 	  Use SoftDevice Link Layer implementation.
 
@@ -56,7 +63,6 @@ choice BT_LL_SOFTDEVICE_BUILD_TYPE
 
 config BT_LL_SOFTDEVICE_BUILD_TYPE_LIB
 	bool "Use library"
-	select BT_LL_SOFTDEVICE_HEADERS_INCLUDE
 
 endchoice
 
@@ -166,7 +172,7 @@ config BT_CTLR_SDC_CONN_EVENT_EXTEND_DEFAULT
 	  When Extended Connection Events are enabled, the controller
 	  will extend the connection event as much as possible, if
 	  - Either of the peers has more data to send.
-	    See also: Core v5.6, Vol 6, Part B, Section 4.5.6.
+	    See also: Bluetooth Core Specification, Vol 6, Part B, Section 4.5.6.
 	  - There are no conflicts with other roles of equal or higher priority.
 
 config BT_CTLR_SDC_CENTRAL_ACL_EVENT_SPACING_DEFAULT
@@ -303,15 +309,16 @@ choice BT_LL_SOFTDEVICE_VARIANT
 						     BT_CTLR_PHY_CODED || \
 						     BT_CTLR_ADV_PERIODIC || \
 						     BT_CTLR_DF_CTE_TX || \
-						     MPSL_CX_BT_1WIRE || \
+						     MPSL_CX || \
 						     BT_CTLR_SYNC_PERIODIC || \
 						     BT_CTLR_SCA_UPDATE || \
+						     BT_CTLR_SUBRATING || \
 						     BT_CTLR_SDC_PAWR_ADV || \
 						     BT_CTLR_SDC_PAWR_SYNC || \
 						     BT_ISO || \
 						     SOC_COMPATIBLE_NRF5340_CPUNET || \
 						     SOC_NRF54H20_CPURAD || \
-						     SOC_NRF54L15_ENGA_CPUAPP)
+						     SOC_SERIES_NRF54LX)
 	default BT_LL_SOFTDEVICE_CENTRAL if BT_OBSERVER
 	default BT_LL_SOFTDEVICE_PERIPHERAL if BT_BROADCASTER
 	help
@@ -353,7 +360,8 @@ choice BT_CTLR_ECDH_LIB
 	prompt "SoftDevice Controller ECDH library"
 
 config BT_CTLR_ECDH_LIB_OBERON
-	select NRF_OBERON
+	select NRF_OBERON if !BUILD_WITH_TFM
+	select NORDIC_SECURITY_BACKEND if BUILD_WITH_TFM
 	depends on !SOC_SERIES_BSIM_NRFXX
 	bool "nRF Oberon (SW)"
 
@@ -391,6 +399,17 @@ config BT_CTLR_SDC_EVENT_TRIGGER
 	  When enabled, this feature will trigger a (D)PPI task at the start of radio events.
 	  When used for connections, the connection event trigger can be configured to trigger
 	  every N connection events starting from a given connection event counter.
+
+config BT_CTLR_SDC_CONN_ANCHOR_POINT_REPORT
+	bool "Connection event anchor point reports"
+	depends on BT_CONN
+	help
+	  Enable support for obtaining connection anchor point reports.
+	  This is a proprietary SDC feature which allows the controller
+	  to produce timestamps for ACL connection anchor points.
+	  A new timestamp is generated whenever a connection's anchor point changes.
+	  The reporting is enabled through an HCI command.
+	  See Bluetooth Core Specification, Vol 6, Part B, Section 4.5.1.
 
 config BT_CTLR_SDC_ISO_RX_PDU_BUFFER_PER_STREAM_COUNT
 	int "BT_CTLR_SDC_ISO_RX_PDU_BUFFER_PER_STREAM_COUNT"
@@ -515,14 +534,6 @@ config BT_CTLR_SDC_PERIODIC_SYNC_RSP_TX_BUFFER_COUNT
 
 endif
 
-config BT_CTLR_SDC_LE_PATH_LOSS_MONITORING
-	bool "LE Path Loss Monitoring Feature"
-	depends on BT_CTLR_LE_POWER_CONTROL
-	select EXPERIMENTAL
-	help
-	  Enable support for LE Path Loss Monitoring feature that is defined in the
-	  Bluetooth Core specification, Version 5.4 | Vol 6, Part B, Section 4.6.32.
-
 config BT_CTLR_SDC_SILENCE_UNEXPECTED_MSG_TYPE
 	bool
 	help
@@ -562,6 +573,13 @@ config BT_CTLR_SDC_CIS_SUBEVENT_LENGTH_US
 	  HCI command used to configure the CIG will fail.
 	  If this parameter is set to zero, the subevent length
 	  is chosen by the controller.
+
+config BT_CTLR_SDC_CS_COUNT
+	int "Number of concurrent connections supporting CS procedure"
+	default 1
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	help
+	  Set the number of concurrent connections that can support Channel Sounding procedure.
 
 endmenu
 endif  # BT_LL_SOFTDEVICE

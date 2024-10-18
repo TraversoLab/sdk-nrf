@@ -71,7 +71,7 @@ Building and running
 Complete the following steps to program the sample:
 
 1. Go to the sample directory.
-#. Open the command line terminal.
+#. |open_terminal_window_with_environment|
 #. Run the following command to build the application code for the host and the remote:
 
 
@@ -83,9 +83,11 @@ Complete the following steps to program the sample:
 
    **nRF54H20 DK**
 
+   A snippet for running the PPR core is added automatically to build configuration.
+
    .. code-block:: console
 
-      west build -b nrf54h20dk/nrf54h20/cpuapp -- -Devent_manager_proxy_SNIPPET=nordic-ppr
+      west build -b nrf54h20dk/nrf54h20/cpuapp
 
    or use twister test case:
 
@@ -99,6 +101,7 @@ Complete the following steps to program the sample:
 
       west flash
 
+.. include:: /includes/nRF54H20_erase_UICR.txt
 
 Testing
 =======

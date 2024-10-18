@@ -123,7 +123,7 @@ The mesh light switch sample can also be run as a Low Power node (LPN), giving t
       Instead, the user can manually enable the Node ID advertisement for a period of 30 seconds by pressing **Button 4** on the device.
       This will give the user a short period of time to connect directly to the LPN, and thus perform necessary configuration of the device.
 
-   .. group-tab:: nRF21, nRF52 and nRF53 DKs
+   .. group-tab:: nRF54 DKs
 
       While running the sample with the LPN configuration, the fourth :ref:`bt_mesh_onoff_cli_readme` instance will be omitted.
       Instead, **Button 3** will be used to temporarily enable Node ID advertisement on the LPN device.
@@ -228,7 +228,7 @@ The light switch sample is split into the following source files:
 LPN configuration
 =================
 
-To make the light switch run as an LPN, set :makevar:`EXTRA_CONF_FILE` to :file:`overlay-lpn.conf` when building the sample.
+To make the light switch run as an LPN, set :makevar:`EXTRA_CONF_FILE` to :file:`overlay-lpn.conf` when building the sample using the respective :ref:`CMake option <cmake_options>`.
 For example, when building from the command line, use the following command, where *board_target* is the target for the development kit for which you are building:
 
 .. parsed-literal::
@@ -238,7 +238,8 @@ For example, when building from the command line, use the following command, whe
 
 The configuration overlay :file:`overlay-lpn.conf` enables the LPN feature, and alters certain configuration options to further lower the power consumption.
 To review the specific alterations, open and inspect the :file:`overlay-lpn.conf` file.
-For more information about using configuration overlay files, see :ref:`zephyr:important-build-vars` in the Zephyr documentation.
+
+For more information about configuration files in the |NCS|, see :ref:`app_build_system`.
 
 FEM support
 ===========

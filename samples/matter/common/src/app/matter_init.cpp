@@ -7,6 +7,7 @@
 #include "matter_init.h"
 
 #include "app/fabric_table_delegate.h"
+#include "app/group_data_provider.h"
 #include "migration/migration_manager.h"
 
 #ifdef CONFIG_NCS_SAMPLE_MATTER_SETTINGS_SHELL
@@ -37,10 +38,15 @@
 #include "watchdog/watchdog.h"
 #endif
 
+#ifdef CONFIG_NCS_SAMPLE_MATTER_TEST_SHELL
+#include "test/test_shell.h"
+#endif
+
 #include <app/InteractionModelEngine.h>
 #include <app/clusters/network-commissioning/network-commissioning.h>
 #include <app/server/OnboardingCodesUtil.h>
 #include <credentials/examples/DeviceAttestationCredsExample.h>
+#include <platform/nrfconnect/ExternalFlashManager.h>
 
 LOG_MODULE_DECLARE(app, CONFIG_CHIP_APP_LOG_LEVEL);
 
@@ -128,6 +134,7 @@ void FeedFromMatter(Nrf::Watchdog::WatchdogSource *watchdogSource)
 }
 #endif
 
+/* Matter stack design implies different initialization procedure for Thread and Wi-Fi backend. */
 #if defined(CONFIG_NET_L2_OPENTHREAD)
 CHIP_ERROR ConfigureThreadRole()
 {
@@ -146,6 +153,32 @@ CHIP_ERROR ConfigureThreadRole()
 
 	return ConnectivityMgr().SetThreadDeviceType(threadRole);
 }
+
+CHIP_ERROR InitNetworkingStack()
+{
+	CHIP_ERROR error{ CHIP_NO_ERROR };
+
+	error = ThreadStackMgr().InitThreadStack();
+	VerifyOrReturnLogError(error == CHIP_NO_ERROR, error);
+
+	error = ConfigureThreadRole();
+	VerifyOrReturnLogError(error == CHIP_NO_ERROR, error);
+
+	return error;
+}
+
+#elif defined(CONFIG_CHIP_WIFI)
+
+CHIP_ERROR InitNetworkingStack()
+{
+	if (sLocalInitData.mNetworkingInstance) {
+		sLocalInitData.mNetworkingInstance->Init();
+	}
+
+	return CHIP_NO_ERROR;
+}
+#else
+#error "No valid L2 network backend selected");
 #endif /* CONFIG_NET_L2_OPENTHREAD */
 
 #define VerifyInitResultOrReturn(ec, msg)                                                                              \
@@ -178,23 +211,9 @@ void DoInitChipServer(intptr_t /* unused */)
 		VerifyInitResultOrReturn(sInitResult, "Custom pre server initialization failed");
 	}
 
-#if defined(CONFIG_NET_L2_OPENTHREAD)
-	sInitResult = ThreadStackMgr().InitThreadStack();
-	VerifyInitResultOrReturn(sInitResult, "ThreadStackMgr().InitThreadStack() failed");
-
-	sInitResult = ConfigureThreadRole();
-	VerifyInitResultOrReturn(sInitResult, "Cannot configure Thread role");
-
-#elif defined(CONFIG_CHIP_WIFI)
-	if (!sLocalInitData.mNetworkingInstance) {
-		sInitResult = CHIP_ERROR_INTERNAL;
-		VerifyInitResultOrReturn(sInitResult, "No valid commissioning instance");
-	}
-	sLocalInitData.mNetworkingInstance->Init();
-#else
-	sInitResult = CHIP_ERROR_INTERNAL;
-	VerifyInitResultOrReturn(sInitResult, "No valid L2 network backend selected");
-#endif /* CONFIG_NET_L2_OPENTHREAD */
+	/* Initialize L2 networking backend. */
+	sInitResult = InitNetworkingStack();
+	VerifyInitResultOrReturn(sInitResult, "Cannot initialize IPv6 networking stack");
 
 #ifdef CONFIG_CHIP_OTA_REQUESTOR
 	/* OTA image confirmation must be done before the factory data init. */
@@ -206,6 +225,9 @@ void DoInitChipServer(intptr_t /* unused */)
 	Nrf::GetDFUOverSMP().Init();
 	Nrf::GetDFUOverSMP().ConfirmNewImage();
 #endif
+
+	/* Set External Flash into sleep mode */
+	ExternalFlashManager::GetInstance().DoAction(ExternalFlashManager::Action::SLEEP);
 
 	/* Initialize CHIP server */
 #ifdef CONFIG_CHIP_FACTORY_DATA
@@ -249,6 +271,15 @@ void DoInitChipServer(intptr_t /* unused */)
 	VerifyOrReturn(sLocalInitData.mServerInitParams, LOG_ERR("No valid server initialization parameters"));
 	sInitResult = sLocalInitData.mServerInitParams->InitializeStaticResourcesBeforeServerInit();
 	VerifyInitResultOrReturn(sInitResult, "InitializeStaticResourcesBeforeServerInit() failed");
+
+	/* Inject Nordic specific group data provider that allows for optimization of factory reset. */
+	Nrf::Matter::GroupDataProviderImpl::Instance().SetStorageDelegate(
+		sLocalInitData.mServerInitParams->persistentStorageDelegate);
+	Nrf::Matter::GroupDataProviderImpl::Instance().SetSessionKeystore(
+		sLocalInitData.mServerInitParams->sessionKeystore);
+	sInitResult = Nrf::Matter::GroupDataProviderImpl::Instance().Init();
+	VerifyInitResultOrReturn(sInitResult, "Initialization of GroupDataProvider failed");
+	sLocalInitData.mServerInitParams->groupDataProvider = &Nrf::Matter::GroupDataProviderImpl::Instance();
 
 	sInitResult = PlatformMgr().AddEventHandler(sLocalInitData.mEventHandler, 0);
 	VerifyInitResultOrReturn(sInitResult, "Cannot register CHIP event handler");
@@ -318,6 +349,10 @@ CHIP_ERROR PrepareServer(const InitData &initData)
 	VerifyInitResultOrReturnError(err, "Platform::MemoryInit() failed");
 	err = PlatformMgr().InitChipStack();
 	VerifyInitResultOrReturnError(err, "PlatformMgr().InitChipStack() failed");
+
+#ifdef CONFIG_NCS_SAMPLE_MATTER_TEST_SHELL
+	Nrf::RegisterTestCommands();
+#endif
 
 	/* Schedule all CHIP initializations to the CHIP thread for better synchronization. */
 	return PlatformMgr().ScheduleWork(DoInitChipServer, 0);

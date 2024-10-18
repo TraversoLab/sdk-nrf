@@ -39,7 +39,7 @@ namespace Nrf::Matter
 OTAImageProcessorImpl &GetOTAImageProcessor()
 {
 #if CONFIG_PM_DEVICE && CONFIG_NORDIC_QSPI_NOR
-	static OTAImageProcessorBaseImpl sOTAImageProcessor(&GetFlashHandler());
+	static OTAImageProcessorBaseImpl sOTAImageProcessor(&ExternalFlashManager::GetInstance());
 #else
 	static OTAImageProcessorBaseImpl sOTAImageProcessor;
 #endif
@@ -57,11 +57,11 @@ void InitBasicOTARequestor()
 	sOTARequestor.Init(Server::GetInstance(), sOTARequestorStorage, sOTARequestorDriver, sBDXDownloader);
 	chip::SetRequestorInstance(&sOTARequestor);
 	sOTARequestorDriver.Init(&sOTARequestor, &imageProcessor);
-	imageProcessor.TriggerFlashAction(ExternalFlashManager::Action::SLEEP);
 }
 
 void OtaConfirmNewImage()
 {
+#if CONFIG_BOOTLOADER_MCUBOOT
 #ifndef CONFIG_SOC_SERIES_NRF53X
 	/* Check if the image is run in the REVERT mode and eventually
 	confirm it to prevent reverting on the next boot.
@@ -81,14 +81,9 @@ void OtaConfirmNewImage()
 				     "Failed to confirm firmware image, it will be reverted on the next boot");
 		}
 	}
+#endif /* CONFIG_BOOTLOADER_MCUBOOT */
 }
 
 #endif
-
-ExternalFlashManager &GetFlashHandler()
-{
-	static ExternalFlashManager sFlashHandler;
-	return sFlashHandler;
-}
 
 } /* namespace Nrf::Matter */

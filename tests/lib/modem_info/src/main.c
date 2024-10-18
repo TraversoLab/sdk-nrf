@@ -21,7 +21,6 @@
 DEFINE_FFF_GLOBALS;
 
 FAKE_VALUE_FUNC(int, nrf_modem_at_notif_handler_set, nrf_modem_at_notif_handler_t);
-FAKE_VALUE_FUNC(int, at_params_list_init, struct at_param_list *, size_t);
 FAKE_VALUE_FUNC_VARARG(int, nrf_modem_at_scanf, const char *, const char *, ...);
 FAKE_VALUE_FUNC_VARARG(int, nrf_modem_at_cmd, void *, size_t, const char *, ...);
 
@@ -34,7 +33,7 @@ FAKE_VALUE_FUNC_VARARG(int, nrf_modem_at_cmd, void *, size_t, const char *, ...)
 #define EXAMPLE_TEMP 24
 #define EXAMPLE_RSRP_INVALID 255
 #define EXAMPLE_RSRP_VALID 160
-#define RSRP_OFFSET 140
+#define RSRP_OFFSET 141
 #define EXAMPLE_BAND 13
 #define EXAMPLE_BAND_MAX_VAL 71
 #define EXAMPLE_ONE_LETTER_OPERATOR_NAME "O"
@@ -44,12 +43,6 @@ FAKE_VALUE_FUNC_VARARG(int, nrf_modem_at_cmd, void *, size_t, const char *, ...)
 #define SHORT_OP_NAME_SIZE_WITHOUT_NULL_TERM 64
 BUILD_ASSERT(SHORT_OP_NAME_SIZE_WITHOUT_NULL_TERM == (MODEM_INFO_SHORT_OP_NAME_SIZE - 1),
 	     "Short operator size macros must match");
-
-struct at_param at_params[10] = {};
-static struct at_param_list m_param_list = {
-	.param_count = 0,
-	.params = at_params,
-};
 
 static int nrf_modem_at_scanf_custom_no_match(const char *cmd, const char *fmt, va_list args)
 {
@@ -145,7 +138,7 @@ static int nrf_modem_at_scanf_custom_xcband(const char *cmd, const char *fmt, va
 	TEST_ASSERT_EQUAL_STRING("AT%XCBAND", cmd);
 	TEST_ASSERT_EQUAL_STRING("%%XCBAND: %u", fmt);
 
-	uint8_t *val = va_arg(args, uint8_t *);
+	unsigned int *val = va_arg(args, unsigned int *);
 	*val = EXAMPLE_BAND;
 
 	return 1;
@@ -156,7 +149,7 @@ static int nrf_modem_at_scanf_custom_xcband_max_val(const char *cmd, const char 
 	TEST_ASSERT_EQUAL_STRING("AT%XCBAND", cmd);
 	TEST_ASSERT_EQUAL_STRING("%%XCBAND: %u", fmt);
 
-	uint8_t *val = va_arg(args, uint8_t *);
+	unsigned int *val = va_arg(args, unsigned int *);
 	*val = EXAMPLE_BAND_MAX_VAL;
 
 	return 1;
@@ -168,7 +161,7 @@ static int nrf_modem_at_scanf_custom_xcband_unavailable(const char *cmd, const c
 	TEST_ASSERT_EQUAL_STRING("AT%XCBAND", cmd);
 	TEST_ASSERT_EQUAL_STRING("%%XCBAND: %u", fmt);
 
-	uint8_t *val = va_arg(args, uint8_t *);
+	unsigned int *val = va_arg(args, unsigned int *);
 	*val = BAND_UNAVAILABLE;
 
 	return 1;
@@ -268,7 +261,6 @@ static int nrf_modem_at_scanf_custom_snr(const char *cmd, const char *fmt, va_li
 void setUp(void)
 {
 	RESET_FAKE(nrf_modem_at_notif_handler_set);
-	RESET_FAKE(at_params_list_init);
 	RESET_FAKE(nrf_modem_at_scanf);
 }
 
@@ -276,20 +268,12 @@ void tearDown(void)
 {
 }
 
-int at_params_list_init_custom(struct at_param_list *list, size_t max_params_count)
-{
-	*list = m_param_list;
-	return EXIT_SUCCESS;
-}
-
 void test_modem_info_init_success(void)
 {
 	int ret;
 
-	at_params_list_init_fake.custom_fake = at_params_list_init_custom;
 	ret = modem_info_init();
 	TEST_ASSERT_EQUAL(0, ret);
-	TEST_ASSERT_EQUAL(1, at_params_list_init_fake.call_count);
 }
 
 void test_modem_info_get_fw_uuid_null(void)
@@ -539,6 +523,118 @@ void test_modem_info_get_rsrp_success(void)
 	TEST_ASSERT_EQUAL(EXIT_SUCCESS, ret);
 	TEST_ASSERT_EQUAL(EXAMPLE_RSRP_VALID-RSRP_OFFSET, val);
 	TEST_ASSERT_EQUAL(1, nrf_modem_at_scanf_fake.call_count);
+}
+
+void test_modem_info_RSRP_IDX_TO_DBM(void)
+{
+	int rsrp;
+
+	/* index < 0: index – 140 */
+	rsrp = RSRP_IDX_TO_DBM(-16);
+	TEST_ASSERT_EQUAL(-156, rsrp);
+
+	rsrp = RSRP_IDX_TO_DBM(-1);
+	TEST_ASSERT_EQUAL(-141, rsrp);
+
+	/* index > 0: index – 141 */
+	rsrp = RSRP_IDX_TO_DBM(1);
+	TEST_ASSERT_EQUAL(-140, rsrp);
+
+	rsrp = RSRP_IDX_TO_DBM(2);
+	TEST_ASSERT_EQUAL(-139, rsrp);
+
+	rsrp = RSRP_IDX_TO_DBM(96);
+	TEST_ASSERT_EQUAL(-45, rsrp);
+
+	rsrp = RSRP_IDX_TO_DBM(97);
+	TEST_ASSERT_EQUAL(-44, rsrp);
+
+	/* 0 defined as not used but we'll test because macro accepts anything */
+	rsrp = RSRP_IDX_TO_DBM(0);
+	TEST_ASSERT_EQUAL(-141, rsrp);
+
+	/* Values outside the range of AT command examples */
+	rsrp = RSRP_IDX_TO_DBM(-17);
+	TEST_ASSERT_EQUAL(-157, rsrp);
+
+	rsrp = RSRP_IDX_TO_DBM(98);
+	TEST_ASSERT_EQUAL(-43, rsrp);
+}
+
+void test_modem_info_RSRQ_IDX_TO_DB(void)
+{
+	float rsrq;
+
+	/* index < 0: (index – 39) / 2 */
+	rsrq = RSRQ_IDX_TO_DB(-30);
+	TEST_ASSERT_EQUAL_FLOAT(-34.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(-29);
+	TEST_ASSERT_EQUAL_FLOAT(-34, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(-2);
+	TEST_ASSERT_EQUAL_FLOAT(-20.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(-1);
+	TEST_ASSERT_EQUAL_FLOAT(-20, rsrq);
+
+	/* index > 0 and index < 35: (index – 40) / 2 */
+	rsrq = RSRQ_IDX_TO_DB(1);
+	TEST_ASSERT_EQUAL_FLOAT(-19.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(2);
+	TEST_ASSERT_EQUAL_FLOAT(-19, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(32);
+	TEST_ASSERT_EQUAL_FLOAT(-4, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(33);
+	TEST_ASSERT_EQUAL_FLOAT(-3.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(34);
+	TEST_ASSERT_EQUAL_FLOAT(-3, rsrq);
+
+	/* index ≥ 35: (index – 41) / 2 */
+	rsrq = RSRQ_IDX_TO_DB(35);
+	TEST_ASSERT_EQUAL_FLOAT(-3, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(36);
+	TEST_ASSERT_EQUAL_FLOAT(-2.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(37);
+	TEST_ASSERT_EQUAL_FLOAT(-2, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(38);
+	TEST_ASSERT_EQUAL_FLOAT(-1.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(39);
+	TEST_ASSERT_EQUAL_FLOAT(-1, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(40);
+	TEST_ASSERT_EQUAL_FLOAT(-0.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(41);
+	TEST_ASSERT_EQUAL_FLOAT(0, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(42);
+	TEST_ASSERT_EQUAL_FLOAT(0.5, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(45);
+	TEST_ASSERT_EQUAL_FLOAT(2, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(46);
+	TEST_ASSERT_EQUAL_FLOAT(2.5, rsrq);
+
+	/* 0 defined as not used but we'll test because macro accepts anything */
+	rsrq = RSRQ_IDX_TO_DB(0);
+	TEST_ASSERT_EQUAL_FLOAT(-20, rsrq);
+
+	/* Values outside the range of AT command examples */
+	rsrq = RSRQ_IDX_TO_DB(-31);
+	TEST_ASSERT_EQUAL_FLOAT(-35, rsrq);
+
+	rsrq = RSRQ_IDX_TO_DB(47);
+	TEST_ASSERT_EQUAL_FLOAT(3, rsrq);
 }
 
 void test_modem_info_get_current_band_null(void)

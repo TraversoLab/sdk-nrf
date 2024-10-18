@@ -20,13 +20,14 @@ The sample supports the following development kits:
 .. include:: /includes/tfm.txt
 
 .. note::
-   * The boards ``nrf52dk_nrf52810``, ``nrf52840dk_nrf52811``, and ``nrf52833dk_nrf52820`` only support the `Minimal sample variant`_.
+   * The boards ``nrf52dk/nrf52810``, ``nrf52840dk/nrf52811``, and ``nrf52833dk/nrf52820`` only support the `Minimal sample variant`_.
    * When used with :ref:`zephyr:thingy53_nrf5340`, the sample supports the MCUboot bootloader with serial recovery and SMP DFU over Bluetooth.
      Thingy:53 has no built-in SEGGER chip, so the UART 0 peripheral is not gated to a USB CDC virtual serial port.
    * When used with :ref:`zephyr:nrf5340dk_nrf5340`, the sample might support the MCUboot bootloader with serial recovery of the networking core image.
 
-The sample also requires a smartphone or tablet running a compatible application.
-The `Testing`_ instructions refer to `nRF Connect for Mobile`_, but you can also use other similar applications (for example, `nRF Blinky`_ or `nRF Toolbox`_).
+The sample also requires using a compatible application for `Testing`_.
+You can use the `nRF Connect Bluetooth Low Energy`_ or `nRF Connect for Mobile`_ applications (or other similar applications, such as `nRF Blinky`_ or `nRF Toolbox`_).
+Using mobile applications for testing requires a smartphone or tablet.
 
 You can also test the application with the :ref:`central_uart` sample.
 See the documentation for that sample for detailed instructions.
@@ -34,7 +35,7 @@ See the documentation for that sample for detailed instructions.
 .. note::
    |thingy53_sample_note|
 
-   The sample also enables an additional USB CDC ACM port that is used instead of UART 0.
+   The sample also enables an additional :ref:`USB CDC ACM class serial port <thingy53_app_usb>` that is used instead of UART 0.
    Because of that, it uses a separate USB Vendor and Product ID.
 
 Overview
@@ -60,7 +61,7 @@ Instead, they are printed by the RTT logger.
 If you want to view the debug messages, follow the procedure in :ref:`testing_rtt_connect`.
 
 .. note::
-   On the Thingy:53, debug logs are provided over the USB CDC ACM class serial port, instead of using RTT.
+   On the Thingy:53, debug logs are provided over the :ref:`USB CDC ACM class serial port <thingy53_app_usb>` instead of :ref:`RTT or other logging backends <ug_logging_backends>`.
 
 For more information about debugging in the |NCS|, see :ref:`debugging`.
 
@@ -141,18 +142,17 @@ Development kits
       Button 1:
          Reject the passkey value that is printed in the debug logs to prevent pairing/bonding with the other device.
 
-Thingy:53
-=========
+   .. group-tab:: Thingy:53
 
-RGB LED:
-   The RGB LED channels are used independently to display the following information:
+      RGB LED:
+         The RGB LED channels are used independently to display the following information:
 
-   * Red channel blinks with a period of two seconds, duty cycle 50%, when the main loop is running (device is advertising).
-   * Green channel displays if device is connected.
+         * Red channel blinks with a period of two seconds, duty cycle 50%, when the main loop is running (device is advertising).
+         * Green channel displays if device is connected.
 
-Button:
-   Confirm the passkey value that is printed in the debug logs to pair/bond with the other device.
-   Thingy:53 has only one button, therefore the passkey value cannot be rejected by pressing a button.
+      Button:
+         Confirm the passkey value that is printed in the debug logs to pair/bond with the other device.
+         Thingy:53 has only one button, therefore the passkey value cannot be rejected by pressing a button.
 
 Configuration
 *************
@@ -176,7 +176,17 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
-.. _peripheral_uart_sample_activating_variants:
+.. include:: /includes/nRF54H20_erase_UICR.txt
+
+Experimental nRF54H20 SoC radio core only build
+===============================================
+
+The sample can also be built in a configuration that allows it to run on the nRF54H20 SoC radio core only.
+To build the sample with this configuration, use the following command:
+
+.. code-block:: console
+
+   west build -b nrf54h20dk/nrf54h20/cpurad
 
 Experimental Bluetooth Low Energy Remote Procedure Call interface
 =================================================================
@@ -185,28 +195,29 @@ To build the sample with a :ref:`ble_rpc` interface, use the following command:
 
 .. code-block:: console
 
-   west build samples/bluetooth/peripheral_uart -b board_name --sysbuild -S nordic-rpc-host -- -DFILE_SUFFIX=bt_rpc
+   west build samples/bluetooth/peripheral_uart -b board_name --sysbuild -S nordic-bt-rpc -- -DFILE_SUFFIX=bt_rpc
+
+.. _peripheral_uart_sample_activating_variants:
 
 Activating sample extensions
 ============================
 
-To activate the optional extensions supported by this sample, modify :makevar:`EXTRA_CONF_FILE` in the following manner:
+To activate the optional extensions supported by this sample, set :makevar:`EXTRA_CONF_FILE` using the respective :ref:`CMake option <cmake_options>` in the following manner:
 
-* For the minimal build variant, set :file:`prj_minimal.conf`.
-* For the USB CDC ACM extension, set :file:`prj_cdc.conf`.
+* For the minimal build variant, set it to :file:`prj_minimal.conf`.
+* For the USB CDC ACM extension, set it to :file:`prj_cdc.conf`.
   Additionally, you need to set :makevar:`DTC_OVERLAY_FILE` to the :file:`usb.overlay` file.
-* For the MCUboot with serial recovery of the networking core image feature, set the :file:`nrf5340dk_app_sr_net.conf` file.
+* For the MCUboot with serial recovery of the networking core image feature, set it to :file:`nrf5340dk_app_sr_net.conf`.
   You also need to set the :makevar:`mcuboot_EXTRA_CONF_FILE` variant to the :file:`nrf5340dk_mcuboot_sr_net.conf` file.
 
-See :ref:`cmake_options` for instructions on how to add this option.
-For more information about using configuration overlay files, see :ref:`zephyr:important-build-vars` in the Zephyr documentation.
+For more information about configuration files in the |NCS|, see :ref:`app_build_system`.
 
 .. _peripheral_uart_testing:
 
 Testing
 =======
 
-After programming the sample to your development kit, complete the following steps to test it:
+After programming the sample to your development kit, complete the following steps to test the basic functionality:
 
 .. tabs::
 
@@ -216,10 +227,46 @@ After programming the sample to your development kit, complete the following ste
          If you use a development kit, UART 0 is forwarded as a COM port (Windows) or ttyACM device (Linux) after you connect the development kit over USB.
          If you use Thingy:53, you must attach the debug board and connect an external USB to UART converter to it.
       #. |connect_terminal|
-      #. Optionally, you can display debug messages. See :ref:`peripheral_uart_debug` for details.
       #. Reset the kit.
-      #. Observe that **LED 1** is blinking and that the device is advertising with the device name that is configured in :kconfig:option:`CONFIG_BT_DEVICE_NAME`.
+      #. Observe that **LED 1** is blinking and the device is advertising under the default name **Nordic_UART_Service**.
+         You can configure this name using the :kconfig:option:`CONFIG_BT_DEVICE_NAME` Kconfig option.
       #. Observe that the text "Starting Nordic UART service example" is printed on the COM listener running on the computer.
+
+   .. group-tab:: nRF54 DKs
+
+      .. note::
+          |nrf54_buttons_leds_numbering|
+
+      1. Connect the device to the computer to access UART 0.
+         If you use a development kit, UART 0 is forwarded as a COM port (Windows) or ttyACM device (Linux) after you connect the development kit over USB.
+         If you use Thingy:53, you must attach the debug board and connect an external USB to UART converter.
+      #. |connect_terminal|
+      #. Reset the kit.
+      #. Observe that **LED 0** is blinking and the device is advertising under the default name **Nordic_UART_Service**.
+         You can configure this name using the :kconfig:option:`CONFIG_BT_DEVICE_NAME` Kconfig option.
+      #. Observe that the text "Starting Nordic UART service example" is printed on the COM listener running on the computer.
+
+.. _peripheral_uart_testing_mobile:
+
+Testing with nRF Connect for Mobile
+-----------------------------------
+
+You can test the sample pairing with a mobile device.
+For this purpose, use `nRF Connect for Mobile`_ (or other similar applications, such as `nRF Blinky`_ or `nRF Toolbox`_).
+
+To perform the test, complete the following steps:
+
+.. tabs::
+
+   .. group-tab:: nRF21, nRF52 and nRF53 DKs
+
+      1. Connect the device to the computer to access UART 0.
+         If you use a development kit, UART 0 is forwarded as a COM port (Windows) or ttyACM device (Linux) after you connect the development kit over USB.
+         If you use Thingy:53, you must attach the debug board and connect an external USB to UART converter.
+      #. |connect_terminal|
+      #. Optionally, you can display debug messages.
+         See :ref:`peripheral_uart_debug` for details.
+      #. Install and start the `nRF Connect for Mobile`_ application on your smartphone or tablet.
       #. Connect to the device using nRF Connect for Mobile.
          Observe that **LED 2** is lit.
       #. Optionally, pair or bond with the device with MITM protection.
@@ -238,14 +285,16 @@ After programming the sample to your development kit, complete the following ste
 
    .. group-tab:: nRF54 DKs
 
+      .. note::
+          |nrf54_buttons_leds_numbering|
+
       1. Connect the device to the computer to access UART 0.
          If you use a development kit, UART 0 is forwarded as a COM port (Windows) or ttyACM device (Linux) after you connect the development kit over USB.
          If you use Thingy:53, you must attach the debug board and connect an external USB to UART converter to it.
       #. |connect_terminal|
-      #. Optionally, you can display debug messages. See :ref:`peripheral_uart_debug` for details.
-      #. Reset the kit.
-      #. Observe that **LED 0** is blinking and that the device is advertising with the device name that is configured in :kconfig:option:`CONFIG_BT_DEVICE_NAME`.
-      #. Observe that the text "Starting Nordic UART service example" is printed on the COM listener running on the computer.
+      #. Optionally, you can display debug messages.
+         See :ref:`peripheral_uart_debug` for details.
+      #. Install and start the `nRF Connect for Mobile`_ application on your smartphone or tablet.
       #. Connect to the device using nRF Connect for Mobile.
          Observe that **LED 1** is lit.
       #. Optionally, pair or bond with the device with MITM protection.
@@ -263,16 +312,18 @@ After programming the sample to your development kit, complete the following ste
          Observe that **LED 1** turns off.
 
 .. _nrf52_computer_testing:
+.. _peripheral_uart_testing_ble:
 
-Testing with nRF Connect for Desktop
-------------------------------------
+Testing with Bluetooth Low Energy app
+-------------------------------------
 
 If you have an nRF52 Series DK with the Peripheral UART sample and either a dongle or second Nordic Semiconductor development kit that supports Bluetooth Low Energy, you can test the sample on your computer.
-Use the Bluetooth Low Energy app in `nRF Connect for Desktop`_ for testing.
+Use the `nRF Connect Bluetooth Low Energy`_ app in `nRF Connect for Desktop`_ for testing.
 
 To perform the test, complete the following steps:
 
-1. Connect to your nRF52 Series DK.
+1. Install the nRF Connect Bluetooth Low Energy app in `nRF Connect for Desktop`_.
+#. Connect to your nRF52 Series DK.
 #. Connect the dongle or second development kit to a USB port of your computer.
 #. Open the Bluetooth Low Energy app.
 #. Select the serial port that corresponds to the dongle or the second development kit.

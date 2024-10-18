@@ -110,7 +110,7 @@ The following sections explain the different applications, libraries, and sample
 Modem library
 =============
 
-.. include:: ../../device_guides/nrf91/nrf91_features.rst
+.. include:: ../../app_dev/device_guides/nrf91/nrf91_features.rst
     :start-after: nrf91_modem_lib_start
     :end-before: nrf91_modem_lib_end
 
@@ -124,9 +124,10 @@ A subset of the following |NCS| libraries are used for DECT NR+:
 Applications and samples
 ========================
 
-The following sample use DECT NR+ in the |NCS|:
+The following samples use DECT NR+ in the |NCS|:
 
 * :ref:`nrf_modem_dect_phy_hello`
+* :ref:`dect_shell_application`
 
 Power optimization
 ==================

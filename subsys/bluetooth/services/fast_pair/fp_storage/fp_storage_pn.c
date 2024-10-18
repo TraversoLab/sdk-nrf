@@ -137,6 +137,13 @@ static int fp_storage_pn_reset(void)
 	int err;
 	bool was_enabled = is_enabled;
 
+	if (was_enabled) {
+		err = fp_storage_pn_uninit();
+		if (err) {
+			return err;
+		}
+	}
+
 	err = settings_delete(SETTINGS_PN_FULL_NAME);
 	if (err) {
 		return err;
@@ -153,13 +160,8 @@ static int fp_storage_pn_reset(void)
 	return 0;
 }
 
-static void reset_prepare(void)
-{
-	/* intentionally left empty */
-}
-
 SETTINGS_STATIC_HANDLER_DEFINE(fp_storage_pn, SETTINGS_PN_SUBTREE_NAME, NULL, fp_settings_set,
 			       NULL, NULL);
 
-FP_STORAGE_MANAGER_MODULE_REGISTER(fp_storage_pn, fp_storage_pn_reset, reset_prepare,
+FP_STORAGE_MANAGER_MODULE_REGISTER(fp_storage_pn, fp_storage_pn_reset,
 				   fp_storage_pn_init, fp_storage_pn_uninit);

@@ -55,8 +55,8 @@ extern const uint8_t manifest_recovery_validate_load_invoke_buf[];
 extern const size_t manifest_recovery_validate_load_invoke_len;
 
 /* Valid recovery envelope */
-extern const uint8_t manifest_valid_recovery_buf[];
-extern const size_t manifest_valid_recovery_len;
+extern uint8_t manifest_valid_recovery_buf[];
+extern size_t manifest_valid_recovery_len;
 
 /* Originally valid recovery envelope with manipulated single byte */
 extern const uint8_t manifest_manipulated_recovery_buf[];
@@ -136,7 +136,7 @@ static void setup_boot_report(uint8_t *buf, size_t len)
 
 ZTEST_SUITE(orchestrator_recovery_boot_tests, NULL, setup_install_recovery_fw, NULL, NULL, NULL);
 
-ZTEST(orchestrator_recovery_boot_tests, test_no_recovery_envelope)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_no_recovery_envelope)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -166,7 +166,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_no_recovery_envelope)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_invalid_recovery_envelope)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_invalid_recovery_envelope)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -190,7 +190,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_invalid_recovery_envelope)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator fails (hard)... */
-	zassert_equal(-EACCES, err, "Orchestrator did not fail");
+	zassert_equal(-ENOEXEC, err, "Orchestrator did not fail");
 	/* ... and the emergency flag is set... */
 	zassert_equal(SUIT_PLAT_SUCCESS, suit_storage_report_read(0, &buf, &len),
 		      "Emergency flag not set");
@@ -199,7 +199,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_invalid_recovery_envelope)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_valid_recovery_envelope)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_valid_recovery_envelope)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -232,7 +232,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_valid_recovery_envelope)
 		      "Execution mode not changed to the POST INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_seq_no_validate)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_seq_no_validate)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -256,7 +256,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_no_validate)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator fails (hard)... */
-	zassert_equal(-EACCES, err, "Orchestrator did not fail");
+	zassert_equal(-EILSEQ, err, "Orchestrator did not fail");
 	/* ... and the emergency flag is set... */
 	zassert_equal(SUIT_PLAT_SUCCESS, suit_storage_report_read(0, &buf, &len),
 		      "Emergency flag not set");
@@ -265,7 +265,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_no_validate)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_fail)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_seq_validate_fail)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -289,7 +289,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_fail)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator fails (hard)... */
-	zassert_equal(-EACCES, err, "Orchestrator did not fail");
+	zassert_equal(-EILSEQ, err, "Orchestrator did not fail");
 	/* ... and the emergency flag is set... */
 	zassert_equal(SUIT_PLAT_SUCCESS, suit_storage_report_read(0, &buf, &len),
 		      "Emergency flag not set");
@@ -298,7 +298,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_fail)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_fail)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_seq_validate_load_fail)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -322,7 +322,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_fail)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator fails (hard)... */
-	zassert_equal(-EACCES, err, "Orchestrator did not fail");
+	zassert_equal(-EILSEQ, err, "Orchestrator did not fail");
 	/* ... and the emergency flag is set... */
 	zassert_equal(SUIT_PLAT_SUCCESS, suit_storage_report_read(0, &buf, &len),
 		      "Emergency flag not set");
@@ -331,7 +331,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_fail)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_no_invoke)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_seq_validate_load_no_invoke)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -355,7 +355,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_no_invoke)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator fails (hard)... */
-	zassert_equal(-EACCES, err, "Orchestrator did not fail");
+	zassert_equal(-EILSEQ, err, "Orchestrator did not fail");
 	/* ... and the emergency flag is set... */
 	zassert_equal(SUIT_PLAT_SUCCESS, suit_storage_report_read(0, &buf, &len),
 		      "Emergency flag not set");
@@ -364,7 +364,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_no_invoke)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_invoke_fail)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_seq_validate_load_invoke_fail)
 {
 	const uint8_t *buf;
 	size_t len;
@@ -388,7 +388,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_invoke_fail)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator fails (hard)... */
-	zassert_equal(-EACCES, err, "Orchestrator did not fail");
+	zassert_equal(-EILSEQ, err, "Orchestrator did not fail");
 	/* ... and the emergency flag is set... */
 	zassert_equal(SUIT_PLAT_SUCCESS, suit_storage_report_read(0, &buf, &len),
 		      "Emergency flag not set");
@@ -397,7 +397,7 @@ ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_invoke_fail)
 		      "Execution mode not changed to the FAIL INVOKE RECOVERY");
 }
 
-ZTEST(orchestrator_recovery_boot_tests, test_seq_validate_load_invoke)
+ZTEST(orchestrator_recovery_boot_tests, test_rec_seq_validate_load_invoke)
 {
 	const uint8_t *buf;
 	size_t len;

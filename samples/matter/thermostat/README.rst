@@ -35,7 +35,7 @@ IPv6 network support
 
 The development kits for this sample offer the following IPv6 network support for Matter:
 
-* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, and ``nrf54l15pdk/nrf54l15/cpuapp``.
+* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, and ``nrf54l15dk/nrf54l15/cpuapp``.
 * Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002_ek`` shield attached or for ``nrf7002dk/nrf5340/cpuapp``.
 
 Overview
@@ -111,6 +111,13 @@ Matter thermostat custom configurations
 .. include:: ../light_bulb/README.rst
     :start-after: matter_light_bulb_sample_configuration_file_types_start
     :end-before: matter_light_bulb_sample_configuration_file_types_end
+
+Matter thermostat with Trusted Firmware-M
+=========================================
+
+.. include:: ../template/README.rst
+    :start-after: matter_template_build_with_tfm_start
+    :end-before: matter_template_build_with_tfm_end
 
 Device Firmware Upgrade support
 ===============================

@@ -55,6 +55,12 @@ static struct radio_param_config {
 	/** Duty cycle. */
 	uint32_t duty_cycle;
 
+	/**
+	 * Number of packets to be received.
+	 * Set to zero for continuous RX.
+	 */
+	uint32_t rx_packets_num;
+
 #if CONFIG_FEM
 	/* Front-end module (FEM) configuration. */
 	struct radio_test_fem fem;
@@ -237,6 +243,37 @@ static int cmd_tx_carrier_start(const struct shell *shell, size_t argc,
 static void tx_modulated_carrier_end(void)
 {
 	printk("The modulated TX has finished\n");
+}
+
+static void rx_end(void)
+{
+	uint32_t recv_pkt, req_pkt;
+	float error_rate;
+
+	struct radio_rx_stats rx_stats;
+
+	memset(&rx_stats, 0, sizeof(rx_stats));
+
+	radio_rx_stats_get(&rx_stats);
+
+	recv_pkt = rx_stats.packet_cnt;
+	req_pkt = config.rx_packets_num;
+
+	if (req_pkt == 0 || req_pkt < recv_pkt) {
+		printk("Error receiving packets\n");
+		return;
+	}
+
+	error_rate = ((float)(req_pkt - recv_pkt) / req_pkt) * 100.0f;
+
+	printk("\n");
+	printk("Received number of packets: %d\n", recv_pkt);
+	printk("Required number of packages: %d\n", req_pkt);
+	printk("Error rate: %.2f%%\n", (double)error_rate);
+
+	if (error_rate >= 10) {
+		printk("\033[91mWarning: High error rate! \033[0m\n");
+	}
 }
 
 static int cmd_tx_modulated_carrier_start(const struct shell *shell,
@@ -439,6 +476,22 @@ static int cmd_print(const struct shell *shell, size_t argc, char **argv)
 		break;
 #endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_25) */
 
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_6:
+		shell_print(shell,
+			    "Data rate: %s",
+			    STRINGIFY(NRF_RADIO_MODE_NRF_4MBIT_BT_0_6));
+		break;
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_4:
+		shell_print(shell,
+			    "Data rate: %s",
+			    STRINGIFY(NRF_RADIO_MODE_NRF_4MBIT_BT_0_4));
+		break;
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4) */
+
 	case NRF_RADIO_MODE_NRF_1MBIT:
 		shell_print(shell,
 			    "Data rate: %s",
@@ -583,6 +636,11 @@ static int cmd_rx_start(const struct shell *shell, size_t argc, char **argv)
 		test_in_progress = false;
 	}
 
+	if (argc > 2) {
+		shell_error(shell, "%s: too many arguments", argv[0]);
+		return -EINVAL;
+	}
+
 #if CONFIG_HAS_HW_NRF_RADIO_IEEE802154
 	ieee_channel_check(shell, config.channel_start);
 #endif /* CONFIG_HAS_HW_NRF_RADIO_IEEE802154 */
@@ -595,6 +653,18 @@ static int cmd_rx_start(const struct shell *shell, size_t argc, char **argv)
 #if CONFIG_FEM
 	test_config.fem = config.fem;
 #endif /* CONFIG_FEM */
+
+	if (argc == 2) {
+		config.rx_packets_num = atoi(argv[1]);
+		test_config.params.rx.packets_num = config.rx_packets_num;
+		test_config.params.rx.cb = rx_end;
+
+		if (config.rx_packets_num == 0) {
+			shell_error(shell,
+				   "The number of packets to receive must be greater than zero.");
+			return -EINVAL;
+		}
+	}
 
 	radio_test_start(&test_config);
 
@@ -783,19 +853,35 @@ static void cmd_neg16dbm(const struct shell *shell, size_t argc, char **argv)
 	shell_print(shell, "TX power : %d dBm", config.txpower);
 }
 
+#if defined(RADIO_TXPOWER_TXPOWER_Neg18dBm)
+static void cmd_neg18dbm(const struct shell *shell, size_t argc, char **argv)
+{
+	config.txpower = -18;
+	shell_print(shell, "TX power : %d dBm", config.txpower);
+}
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg18dBm) */
+
 static void cmd_neg20dbm(const struct shell *shell, size_t argc, char **argv)
 {
 	config.txpower = -20;
 	shell_print(shell, "TX power : %d dBm", config.txpower);
 }
 
-#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm)
-static void cmd_neg26dbm(const struct shell *shell, size_t argc, char **argv)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg22dBm)
+static void cmd_neg22dbm(const struct shell *shell, size_t argc, char **argv)
 {
-	config.txpower = -26;
+	config.txpower = -22;
 	shell_print(shell, "TX power : %d dBm", config.txpower);
 }
-#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) */
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg22dBm) */
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg28dBm)
+static void cmd_neg28dbm(const struct shell *shell, size_t argc, char **argv)
+{
+	config.txpower = -28;
+	shell_print(shell, "TX power : %d dBm", config.txpower);
+}
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg28dBm) */
 
 #if defined(RADIO_TXPOWER_TXPOWER_Neg30dBm)
 static void cmd_neg30dbm(const struct shell *shell, size_t argc, char **argv)
@@ -826,6 +912,14 @@ static void cmd_neg70dbm(const struct shell *shell, size_t argc, char **argv)
 	shell_print(shell, "TX power : %d dBm", config.txpower);
 }
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg70dBm) */
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg100dBm)
+static void cmd_neg100dbm(const struct shell *shell, size_t argc, char **argv)
+{
+	config.txpower = -100;
+	shell_print(shell, "TX power : %d dBm", config.txpower);
+}
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg100dBm) */
 
 static int cmd_nrf_1mbit(const struct shell *shell, size_t argc, char **argv)
 {
@@ -880,6 +974,30 @@ static int cmd_nrf_4mbit_h_0_25(const struct shell *shell, size_t argc,
 	return 0;
 }
 #endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_25) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+static int cmd_nrf_4mbit_bt_0_6(const struct shell *shell, size_t argc,
+				char **argv)
+{
+	config.mode = NRF_RADIO_MODE_NRF_4MBIT_BT_0_6;
+	shell_print(shell, "Data rate: %s",
+		    STRINGIFY(NRF_RADIO_MODE_NRF_4MBIT_BT_0_6));
+
+	return 0;
+}
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
+static int cmd_nrf_4mbit_bt_0_4(const struct shell *shell, size_t argc,
+				char **argv)
+{
+	config.mode = NRF_RADIO_MODE_NRF_4MBIT_BT_0_4;
+	shell_print(shell, "Data rate: %s",
+		    STRINGIFY(NRF_RADIO_MODE_NRF_4MBIT_BT_0_4));
+
+	return 0;
+}
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4) */
 
 static int cmd_ble_1mbit(const struct shell *shell, size_t argc, char **argv)
 {
@@ -988,6 +1106,18 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_data_rate,
 		  "4 Mbit/s Nordic proprietary radio mode (BT=0.5/h=0.25)",
 		  cmd_nrf_4mbit_h_0_25),
 #endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_25) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	SHELL_CMD(nrf_4Mbit_BT06, NULL,
+		  "4 Mbps Nordic proprietary radio mode (BT=0.6/h=0.5)",
+		  cmd_nrf_4mbit_bt_0_6),
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
+	SHELL_CMD(nrf_4Mbit_BT04, NULL,
+		  "4 Mbps Nordic proprietary radio mode (BT=0.4/h=0.5)",
+		  cmd_nrf_4mbit_bt_0_4),
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4) */
 
 	SHELL_CMD(ble_1Mbit, NULL, "1 Mbit/s Bluetooth Low Energy",
 		  cmd_ble_1mbit),
@@ -1200,10 +1330,16 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_output_power,
 	SHELL_CMD(neg14dBm, NULL, "TX power: -14 dBm", cmd_neg14dbm),
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg14dBm) */
 	SHELL_CMD(neg16dBm, NULL, "TX power: -16 dBm", cmd_neg16dbm),
+#if defined(RADIO_TXPOWER_TXPOWER_Neg18dBm)
+	SHELL_CMD(neg18dBm, NULL, "TX power: -18 dBm", cmd_neg18dbm),
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg18dBm) */
 	SHELL_CMD(neg20dBm, NULL, "TX power: -20 dBm", cmd_neg20dbm),
-#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm)
-	SHELL_CMD(neg26dBm, NULL, "TX power: -26 dBm", cmd_neg26dbm),
-#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) */
+#if defined(RADIO_TXPOWER_TXPOWER_Neg22dBm)
+	SHELL_CMD(neg22dBm, NULL, "TX power: -22 dBm", cmd_neg22dbm),
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg22dBm) */
+#if defined(RADIO_TXPOWER_TXPOWER_Neg28dBm)
+	SHELL_CMD(neg28dBm, NULL, "TX power: -28 dBm", cmd_neg28dbm),
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg28dBm) */
 #if defined(RADIO_TXPOWER_TXPOWER_Neg30dBm)
 	SHELL_CMD(neg30dBm, NULL, "TX power: -30 dBm", cmd_neg30dbm),
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg30dBm) */
@@ -1214,6 +1350,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_output_power,
 #if defined(RADIO_TXPOWER_TXPOWER_Neg70dBm)
 	SHELL_CMD(neg70dBm, NULL, "TX power: -70 dBm", cmd_neg70dbm),
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg70dBm) */
+#if defined(RADIO_TXPOWER_TXPOWER_Neg100dBm)
+	SHELL_CMD(neg100dBm, NULL, "TX power: -100 dBm", cmd_neg100dbm),
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg100dBm) */
 	SHELL_SUBCMD_SET_END
 );
 

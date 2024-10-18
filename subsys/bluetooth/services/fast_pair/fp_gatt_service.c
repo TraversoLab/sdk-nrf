@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <zephyr/net/buf.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/random/random.h>
 
@@ -207,6 +207,11 @@ static int notify_personalized_name(struct bt_conn *conn)
 	size_t packet_len;
 	uint8_t nonce[FP_CRYPTO_ADDITIONAL_DATA_NONCE_LEN];
 	static struct bt_gatt_attr *additional_data_attr;
+
+	if (!IS_ENABLED(CONFIG_BT_FAST_PAIR_PN)) {
+		__ASSERT_NO_MSG(false);
+		return -ENOTSUP;
+	}
 
 	err = fp_storage_pn_get(pn);
 	if (err) {
@@ -542,6 +547,11 @@ static ssize_t write_key_based_pairing(struct bt_conn *conn,
 	if (net_buf_simple_max_len(&gatt_write) == FP_CRYPTO_ECDH_PUBLIC_KEY_LEN) {
 		keygen_params.public_key = net_buf_simple_pull_mem(&gatt_write,
 								   FP_CRYPTO_ECDH_PUBLIC_KEY_LEN);
+	} else if (!IS_ENABLED(CONFIG_BT_FAST_PAIR_SUBSEQUENT_PAIRING)) {
+		LOG_WRN("This operation requires support for the subsequent pairing feature."
+			"Enable the CONFIG_BT_FAST_PAIR_SUBSEQUENT_PAIRING Kconfig to support it");
+		res = BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+		goto finish;
 	} else {
 		keygen_params.public_key = NULL;
 	}

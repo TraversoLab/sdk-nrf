@@ -126,7 +126,7 @@ You can program a portion of the application code related to the nRF70 Series' W
 This option is available only when building for the nRF5340 DK with the nRF7002 EK shield attached.
 To prepare an application to use this feature, you need to create additional MCUboot partitions.
 To learn how to configure MCUboot partitions, see the :ref:`nrf70_fw_patch_update_adding_partitions` guide.
-To enable this feature for Matter, set the :kconfig:option:`SB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE`, :kconfig:option:`SB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH` Kconfig options to ``y``, and set the :kconfig:option:`SB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES` Kconfig option to ``3``.
+To enable this feature for Matter, set the ``SB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE``, ``SB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH`` Kconfig options to ``y``, and set the ``SB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES`` Kconfig option to ``3``.
 
 .. matter_door_lock_sample_nrf70_firmware_patch_end
 
@@ -134,7 +134,7 @@ For example:
 
    .. code-block:: console
 
-      west build -b nrf5340dk/nrf5340/cpuapp -p -- -Dlock_SHIELD=nrf7002ek -Dipc_radio_SHIELD=nrf7002ek_coex -DFILE_SUFFIX=thread_wifi_switched -DSB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE=y -DSB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES=3 -DCONFIG_CHIP_DFU_OVER_BT_SMP=y -DSB_CONFIG_WIFI_NRF700X=y -DSB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH=y
+      west build -b nrf5340dk/nrf5340/cpuapp -p -- -Dlock_SHIELD=nrf7002ek  -DFILE_SUFFIX=thread_wifi_switched -DSB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE=y -DSB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES=3 -DCONFIG_CHIP_DFU_OVER_BT_SMP=y -DSB_CONFIG_WIFI_NRF70=y -DSB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH=y
 
 .. _matter_lock_sample_ble_nus:
 
@@ -194,7 +194,10 @@ You can schedule the following types of timed access:
      - ``Passage`` - The lock can be operated without providing a PIN.
        This option can be used, for example, for employees during working hours.
 
-See the :ref:`matter_lock_enabling_scheduled_timed_access` and :ref:`matter_lock_sample_schedule_testing` sections of this sample for more information.
+To enable the scheduled timed access feature, use the ``schedules`` snippet.
+See the :ref:`matter_lock_snippets` section of this sample to learn how to enable the snippet.
+
+See the :ref:`matter_lock_sample_schedule_testing` section of this sample for more information about testing the scheduled timed access feature.
 
 .. _matter_lock_sample_configuration:
 
@@ -245,6 +248,31 @@ The sample supports the following configurations:
 
 .. matter_door_lock_sample_configuration_file_types_end
 
+Matter lock with Trusted Firmware-M
+===================================
+
+.. include:: ../template/README.rst
+    :start-after: matter_template_build_with_tfm_start
+    :end-before: matter_template_build_with_tfm_end
+
+.. _matter_lock_snippets:
+
+Snippets
+========
+
+.. |snippet| replace:: :makevar:`lock_SNIPPET`
+
+.. include:: /includes/sample_snippets.txt
+
+The following snippet is available:
+
+* ``schedules`` - Enables schedule timed access features.
+
+  .. |snippet_zap_file| replace:: :file:`snippets/schedules/lock.zap`
+  .. |snippet_dir| replace:: :file:`snippets/schedules`
+
+  .. include:: /includes/matter_snippets_note.txt
+
 .. _matter_lock_sample_configuration_dfu:
 
 Device Firmware Upgrade support
@@ -254,7 +282,7 @@ Device Firmware Upgrade support
 
 .. note::
    You can enable over-the-air Device Firmware Upgrade only on hardware platforms that have external flash memory.
-   Currently only nRF52840 DK, nRF5340 DK, nRF7002 DK and nRF54L15 PDK support Device Firmware Upgrade feature.
+   Currently only nRF52840 DK, nRF5340 DK, nRF7002 DK and nRF54L15 DK support Device Firmware Upgrade feature.
 
 The sample supports over-the-air (OTA) device firmware upgrade (DFU) using one of the two following protocols:
 
@@ -329,7 +357,7 @@ This means that a new factory data set will be automatically generated when buil
 To disable factory data support, set the following Kconfig options to ``n``:
 
    * :kconfig:option:`CONFIG_CHIP_FACTORY_DATA`
-   * :kconfig:option:`SB_CONFIG_MATTER_FACTORY_DATA_GENERATE`
+   * ``SB_CONFIG_MATTER_FACTORY_DATA_GENERATE``
 
 To learn more about factory data, read the :doc:`matter:nrfconnect_factory_data_configuration` page in the Matter documentation.
 
@@ -413,7 +441,7 @@ See `Configuration`_ for information about building the sample with the DFU supp
 
 .. code-block:: console
 
-    west build -b nrf54h20dk/nrf54h20/cpuapp -p -- -DSB_CONFIG_WIFI_NRF700X=y -DCONFIG_CHIP_WIFI=y -Dlock_SHIELD=nrf700x_nrf54h20dk
+    west build -b nrf54h20dk/nrf54h20/cpuapp -p -- -DSB_CONFIG_WIFI_NRF70=y -DCONFIG_CHIP_WIFI=y -Dlock_SHIELD=nrf700x_nrf54h20dk
 
 Selecting a configuration
 =========================
@@ -560,123 +588,6 @@ Upgrading the device firmware
 
 To upgrade the device firmware, complete the steps listed for the selected method in the :doc:`matter:nrfconnect_examples_software_update` tutorial of the Matter documentation.
 
-.. _matter_lock_enabling_scheduled_timed_access:
-
-Enabling scheduled timed access
-===============================
-
-To enable the scheduled timed access feature, complete the following steps:
-
-1. Enable all needed scheduled timed access types in the ZAP file:
-
-   a. Open the :file:`lock.zap` file using the following west command:
-
-      .. code-block:: console
-
-         west zap-gui
-
-   #. Select the endpoint that contains the Matter Door Lock cluster.
-      By default, this is `Endpoint-1`.
-
-   #. Click the :guilabel:`Configure` symbol for the ``Door Lock`` cluster entry.
-   #. In the **Door Lock** context window, go to the **Attributes** tab and enable all required attributes:
-
-      * ``NumberOfWeekDaySchedulesSupportedPerUser`` for the ``Week-day`` schedule support.
-      * ``NumberOfYearDaySchedulesSupportedPerUser`` for the ``Year-day`` schedule support.
-      * ``NumberOfHolidaySchedulesSupported`` for the ``Holiday`` schedule support.
-
-   #. In the **Door Lock** context window, go to the **Attribute Reporting** page and enable all required attribute reporting entries:
-
-      * ``NumberOfWeekDaySchedulesSupportedPerUser`` for the ``Week-day`` schedule support.
-      * ``NumberOfYearDaySchedulesSupportedPerUser`` for the ``Year-day`` schedule support.
-      * ``NumberOfHolidaySchedulesSupported`` for the ``Holiday`` schedule support.
-
-   #. In the **Door Lock** context window, go to the **Commands** page and enable all required command entries:
-
-      * For the ``Week-day`` schedule support:
-
-        * ``SetWeekDaySchedule``
-        * ``GetWeekDaySchedule``
-        * ``GetWeekDayScheduleResponse``
-        * ``ClearWeekDaySchedule``
-
-      * For the ``Year-day`` schedule support:
-
-         * ``SetYearDaySchedule``
-         * ``GetYearDaySchedule``
-         * ``GetYearDayScheduleResponse``
-         * ``ClearYearDaySchedule``
-
-      * For the ``Holiday`` schedule support:
-
-         * ``SetHolidaySchedule``
-         * ``GetHolidaySchedule``
-         * ``GetHolidayScheduleResponse``
-         * ``ClearHolidaySchedule``
-
-#. In the **Door Lock** context window, go to the **Attributes** tab and set the proper bits for the ``FeatureMap`` attribute:
-
-   * For the ``Week-day`` schedule support set the ``5th`` bit of the feature map bit map.
-   * For the ``Year-day`` schedule support set the ``11th`` bit of the feature map bit map.
-   * For the ``Holiday`` schedule support set the ``12th`` bit of the feature map bit map.
-
-#. Enable Time Synchronization cluster with all needed types in the ZAP file:
-
-   #. In ZAP Tool GUI, select the endpoint 0 and enable the ``Time Synchronization`` cluster, with both server and client roles, for that endpoint.
-
-   #. Click the :guilabel:`Configure` symbol for the ``Time Synchronization`` cluster entry.
-   #. In the **Time Synchronization** context window, go to the **Attributes** tab and enable all required attributes:
-
-      * ``UTCTime``.
-      * ``Granularity``.
-      * ``TimeZone``.
-      * ``DSTOffset``.
-      * ``LocalTime``.
-      * ``TimeZoneDatabase``.
-      * ``TimeZoneListMaxSize``.
-      * ``DSTOffsetListMaxSize``.
-      * ``TrustedTimeSource``.
-
-   #. In the **Time Synchronization** context window, go to the **Attribute Reporting** page and enable all available attribute reporting entries.
-
-   #. In the **Time Synchronization** context window, go to the **Commands** page and enable all required command entries:
-
-      * ``SetUTCTime``.
-      * ``SetTimeZone``.
-      * ``SetTimeZoneResponse``.
-      * ``SetDSTOffset``.
-      * ``SetTrustedTimeSource``.
-
-#. In the **Time Synchronization** context window, go to the **Attributes** tab and set the proper bits for the ``FeatureMap`` attribute:
-
-   * For the ``TimeZone`` support, set the ``0th`` bit of the feature map bit map.
-   * For the ``TimeSyncClient`` support, set the ``3rd`` bit of the feature map bit map.
-
-   As a result, the default decimal value of the ``FeatureMap`` should be `9`.
-
-#. Save the :file:`lock.zap` file, and close ZAP-tool.
-#. Generate new ZAP files with the changes in the Door Lock cluster using the following west command:
-
-   .. code-block:: console
-
-         west zap-generate
-
-#. Enable the Lock Schedules feature in the |NCS| Matter Lock sample by setting the :kconfig:option:`CONFIG_LOCK_SCHEDULES` Kconfig option to ``y``.
-#. Enable the Read Client support in the |NCS| Matter Lock sample by setting the :kconfig:option:`CONFIG_CHIP_ENABLE_READ_CLIENT` Kconfig option to ``y``.
-#. Use the following Kconfig options to modify the maximum number of specific schedule types:
-
-   - :kconfig:option:`CONFIG_LOCK_MAX_WEEKDAY_SCHEDULES_PER_USER` to define the maximum number of ``Week-day`` schedules for one user.
-   - :kconfig:option:`CONFIG_LOCK_MAX_YEARDAY_SCHEDULES_PER_USER` to define the maximum number of ``Year-day`` schedules for one user.
-   - :kconfig:option:`CONFIG_LOCK_MAX_HOLIDAY_SCHEDULES` to define the maximum number of ``Holiday`` schedules.
-
-To learn more about configuring the Matter clusters, see the :ref:`ug_matter_creating_accessory` user guide.
-
-All scheduled timed access entries are saved to non-volatile memory and loaded automatically after device reboot.
-To disable the feature, you need to revert all changes in the :file:`lock.zap` file, re-generate the ZAP files and set the :kconfig:option:`CONFIG_LOCK_SCHEDULES` Kconfig option to ``n``.
-
-.. note::
-   Adding a single schedule for a user contributes to the settings partition memory occupancy increase.
-
 .. _matter_lock_sample_remote_access_with_pin:
 
 Testing remote access with PIN code credential
@@ -740,6 +651,9 @@ Testing scheduled timed access
 .. note::
    You can test :ref:`matter_lock_scheduled_timed_access` using any Matter compatible controller.
    The following steps use the CHIP Tool controller as an example.
+
+   All scheduled timed access entries are saved to non-volatile memory and loaded automatically after device reboot.
+   Adding a single schedule for a user contributes to the settings partition memory occupancy increase.
 
 After building the sample with the feature enabled and programming it to your development kit, complete the following steps to test scheduled timed access:
 
@@ -859,7 +773,7 @@ To test this feature, complete the following steps:
 
    .. code-block:: console
 
-      west build -b nrf5340dk/nrf5340/cpuapp -- -DFILE_SUFFIX=thread_wifi_switched -Dlock_SHIELD=nrf7002ek -Dipc_radio_SHIELD=nrf7002ek_coex -DSB_CONFIG_WIFI_NRF700X=y
+      west build -b nrf5340dk/nrf5340/cpuapp -- -DFILE_SUFFIX=thread_wifi_switched -Dlock_SHIELD=nrf7002ek  -DSB_CONFIG_WIFI_NRF70=y
 
 #. |connect_terminal_ANSI|
 #. Program the application to the kit using the following command:

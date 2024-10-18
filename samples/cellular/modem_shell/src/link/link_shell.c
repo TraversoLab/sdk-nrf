@@ -12,6 +12,7 @@
 #include <getopt.h>
 
 #include <nrf_modem_at.h>
+#include <modem/nrf_modem_lib.h>
 
 #include "mosh_print.h"
 #include "link.h"
@@ -48,7 +49,8 @@ enum link_shell_command {
 	LINK_CMD_RAI,
 	LINK_CMD_DNSADDR,
 	LINK_CMD_REDMOB,
-	LINK_CMD_PROPRIPSM
+	LINK_CMD_PROPRIPSM,
+	LINK_CMD_MODEM
 };
 
 enum link_shell_operation {
@@ -357,6 +359,16 @@ static const char link_propripsm_usage_str[] =
 	"  -e, --enable,       Enable proprietary PSM\n"
 	"  -h, --help,         Shows this help information";
 
+static const char link_modem_usage_str[] =
+	"Usage: link modem [options]\n"
+	"Options:\n"
+	"      --init,           Initialize modem using nrf_modem_lib_init()\n"
+	"      --shutdown,       Shutdown modem\n"
+	"      --shutdown_cfun0, Send AT+CFUN=0 AT command and shutdown modem\n"
+	"  -h, --help,           Shows this help information\n"
+	"\n"
+	"Several options can be given and they are run in the given order.";
+
 /* The following do not have short options */
 enum {
 	LINK_SHELL_OPT_MEM_SLOT_1 = 1001,
@@ -397,7 +409,10 @@ enum {
 	LINK_SHELL_OPT_LTEM_EDRX,
 	LINK_SHELL_OPT_LTEM_PTW,
 	LINK_SHELL_OPT_NBIOT_EDRX,
-	LINK_SHELL_OPT_NBIOT_PTW
+	LINK_SHELL_OPT_NBIOT_PTW,
+	LINK_SHELL_OPT_MODEM_INIT,
+	LINK_SHELL_OPT_MODEM_SHUTDOWN,
+	LINK_SHELL_OPT_MODEM_SHUTDOWN_CFUN0,
 };
 
 /* Specifying the expected options (both long and short) */
@@ -469,6 +484,9 @@ static struct option long_options[] = {
 	{ "normal_no_rel14", no_argument, 0, LINK_SHELL_OPT_NMODE_NO_REL14 },
 	{ "default", no_argument, 0, LINK_SHELL_OPT_REDMOB_DEFAULT },
 	{ "nordic", no_argument, 0, LINK_SHELL_OPT_REDMOB_NORDIC },
+	{ "init", no_argument, 0, LINK_SHELL_OPT_MODEM_INIT },
+	{ "shutdown", no_argument, 0, LINK_SHELL_OPT_MODEM_SHUTDOWN },
+	{ "shutdown_cfun0", no_argument, 0, LINK_SHELL_OPT_MODEM_SHUTDOWN_CFUN0 },
 	{ 0, 0, 0, 0 }
 };
 
@@ -538,6 +556,9 @@ static void link_shell_print_usage(enum link_shell_command command)
 		break;
 	case LINK_CMD_PROPRIPSM:
 		mosh_print_no_format(link_propripsm_usage_str);
+		break;
+	case LINK_CMD_MODEM:
+		mosh_print_no_format(link_modem_usage_str);
 		break;
 	default:
 		break;
@@ -1376,6 +1397,59 @@ show_usage:
 	return 0;
 }
 
+static int link_shell_modem(const struct shell *shell, size_t argc, char **argv)
+{
+	bool operation_selected = false;
+
+	optreset = 1;
+	optind = 1;
+	int opt;
+
+	while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
+		switch (opt) {
+		case LINK_SHELL_OPT_MODEM_INIT:
+			operation_selected = true;
+			nrf_modem_lib_init();
+			break;
+		case LINK_SHELL_OPT_MODEM_SHUTDOWN:
+			operation_selected = true;
+			nrf_modem_lib_shutdown();
+			break;
+		case LINK_SHELL_OPT_MODEM_SHUTDOWN_CFUN0:
+			operation_selected = true;
+			/* This option is here because applications should be doing it like this.
+			 * User could do CFUN=0 and then shutdown, but that would be too slow
+			 * to simulate application behavior.
+			 */
+			nrf_modem_at_printf("AT+CFUN=0");
+			nrf_modem_lib_shutdown();
+			break;
+
+		case 'h':
+			goto show_usage;
+		case '?':
+		default:
+			mosh_error("Unknown option (%s). See usage:", argv[optind - 1]);
+			goto show_usage;
+		}
+	}
+
+	if (optind < argc) {
+		mosh_error("Arguments without '-' not supported: %s", argv[argc - 1]);
+		goto show_usage;
+	}
+
+	if (!operation_selected) {
+		goto show_usage;
+	}
+
+	return 0;
+
+show_usage:
+	link_shell_print_usage(LINK_CMD_MODEM);
+	return 0;
+}
+
 static int link_shell_msleep(const struct shell *shell, size_t argc, char **argv)
 {
 	enum link_shell_operation operation = LINK_OPERATION_NONE;
@@ -1924,7 +1998,7 @@ static int link_shell_redmob(const struct shell *shell, size_t argc, char **argv
 {
 	int ret;
 	enum link_shell_operation operation = LINK_OPERATION_NONE;
-	enum lte_lc_reduced_mobility_mode redmob_mode = LINK_REDMOB_NONE;
+	enum link_reduced_mobility_mode redmob_mode = LINK_REDUCED_MOBILITY_NONE;
 	char snum[10];
 
 	optreset = 1;
@@ -1943,10 +2017,10 @@ static int link_shell_redmob(const struct shell *shell, size_t argc, char **argv
 			break;
 
 		case LINK_SHELL_OPT_REDMOB_DEFAULT:
-			redmob_mode = LTE_LC_REDUCED_MOBILITY_DEFAULT;
+			redmob_mode = LINK_REDUCED_MOBILITY_DEFAULT;
 			break;
 		case LINK_SHELL_OPT_REDMOB_NORDIC:
-			redmob_mode = LTE_LC_REDUCED_MOBILITY_NORDIC;
+			redmob_mode = LINK_REDUCED_MOBILITY_NORDIC;
 			break;
 
 		case 'h':
@@ -1964,21 +2038,23 @@ static int link_shell_redmob(const struct shell *shell, size_t argc, char **argv
 	}
 
 	if (operation == LINK_OPERATION_DISABLE) {
-		redmob_mode = LTE_LC_REDUCED_MOBILITY_DISABLED;
+		redmob_mode = LINK_REDUCED_MOBILITY_DISABLED;
 	}
 	if (operation == LINK_OPERATION_READ) {
-		enum lte_lc_reduced_mobility_mode mode;
+		enum link_reduced_mobility_mode mode;
+		uint16_t mode_tmp;
 
-		ret = lte_lc_reduced_mobility_get(&mode);
-		if (ret) {
+		ret = nrf_modem_at_scanf("AT%REDMOB?", "%%REDMOB: %hu", &mode_tmp);
+		if (ret != 1) {
 			mosh_error("Cannot get reduced mobility mode: %d", ret);
 		} else {
+			mode = mode_tmp;
 			mosh_print(
 				"Reduced mobility mode read successfully: %s",
 				link_shell_redmob_mode_to_string(mode, snum));
 		}
-	} else if (redmob_mode != LINK_REDMOB_NONE) {
-		ret = lte_lc_reduced_mobility_set(redmob_mode);
+	} else if (redmob_mode != LINK_REDUCED_MOBILITY_NONE) {
+		ret = nrf_modem_at_printf("AT%%REDMOB=%d", redmob_mode);
 		if (ret) {
 			mosh_error("Cannot set reduced mobility mode: %d", ret);
 		} else {
@@ -2280,7 +2356,7 @@ show_usage:
 static int link_shell_settings(const struct shell *shell, size_t argc, char **argv)
 {
 	enum link_shell_operation operation = LINK_OPERATION_NONE;
-	enum lte_lc_factory_reset_type mreset_type = LTE_LC_FACTORY_RESET_INVALID;
+	enum link_factory_reset_type mreset_type = LINK_FACTORY_RESET_INVALID;
 
 	optreset = 1;
 	optind = 1;
@@ -2298,10 +2374,10 @@ static int link_shell_settings(const struct shell *shell, size_t argc, char **ar
 			break;
 
 		case LINK_SHELL_OPT_MRESET_ALL:
-			mreset_type = LTE_LC_FACTORY_RESET_ALL;
+			mreset_type = LINK_FACTORY_RESET_ALL;
 			break;
 		case LINK_SHELL_OPT_MRESET_USER:
-			mreset_type = LTE_LC_FACTORY_RESET_USER;
+			mreset_type = LINK_FACTORY_RESET_USER;
 			break;
 
 		case 'h':
@@ -2321,7 +2397,7 @@ static int link_shell_settings(const struct shell *shell, size_t argc, char **ar
 	if (operation == LINK_OPERATION_READ) {
 		link_sett_all_print();
 	} else if (operation == LINK_OPERATION_RESET ||
-		   mreset_type != LTE_LC_FACTORY_RESET_INVALID) {
+		   mreset_type != LINK_FACTORY_RESET_INVALID) {
 		if (operation == LINK_OPERATION_RESET) {
 			link_sett_defaults_set();
 			if (SYS_MODE_PREFERRED != LINK_SYSMODE_NONE) {
@@ -2329,10 +2405,10 @@ static int link_shell_settings(const struct shell *shell, size_t argc, char **ar
 						       CONFIG_LTE_MODE_PREFERENCE_VALUE);
 			}
 		}
-		if (mreset_type == LTE_LC_FACTORY_RESET_ALL) {
-			link_sett_modem_factory_reset(LTE_LC_FACTORY_RESET_ALL);
-		} else if (mreset_type == LTE_LC_FACTORY_RESET_USER) {
-			link_sett_modem_factory_reset(LTE_LC_FACTORY_RESET_USER);
+		if (mreset_type == LINK_FACTORY_RESET_ALL) {
+			link_sett_modem_factory_reset(mreset_type);
+		} else if (mreset_type == LINK_FACTORY_RESET_USER) {
+			link_sett_modem_factory_reset(mreset_type);
 		}
 	} else {
 		goto show_usage;
@@ -2606,6 +2682,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		ifaddrs, NULL,
 		"Get interface address information (no options).",
 		link_shell_ifaddrs, 1, 0),
+	SHELL_CMD_ARG(
+		modem, NULL,
+		"Initialize and shutdown modem.",
+		link_shell_modem, 0, 2),
 	SHELL_CMD_ARG(
 		msleep, NULL,
 		"Subscribe/unsubscribe for modem sleep notifications.",

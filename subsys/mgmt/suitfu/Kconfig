@@ -35,15 +35,12 @@ config MGMT_SUITFU_GRP_IMG
 	# The IMG MGMT group is substituted, not extended by the SUIT variant
 	depends on !MCUMGR_GRP_IMG
 
-
-if MGMT_SUITFU_GRP_IMG
-
-config MGMT_SUITFU_IMAGE_NUMBER
-	int "Image number representing SUIT envelope"
-	default 0
-
-endif # MGMT_SUITFU_GRP_IMG
-
+config MGMT_SUITFU_GRP_OS_BOOTLOADER_INFO_HOOK
+	bool "Bootloader identification hook"
+	default y
+	depends on MCUMGR_GRP_OS_BOOTLOADER_INFO
+	select MCUMGR_GRP_OS_BOOTLOADER_INFO_HOOK
+	select MCUMGR_MGMT_NOTIFICATION_HOOKS
 
 config MGMT_SUITFU_GRP_SUIT
 	bool "Extended SUIT commands over USER group"
@@ -80,6 +77,11 @@ config MGMT_SUITFU_GRP_SUIT_IMAGE_FETCH
 config MGMT_SUITFU_GRP_SUIT_IMAGE_FETCH_TIMEOUT_MS
 	int "Inter-chunk timeout for image fetching, in ms"
 	default 5000
+
+config MGMT_SUITFU_GRP_SUIT_CACHE_RAW_UPLOAD
+	bool "DFU cache raw image upload"
+	default y
+	depends on SUIT_CACHE_RW
 
 
 endif # MGMT_SUITFU_GRP_SUIT

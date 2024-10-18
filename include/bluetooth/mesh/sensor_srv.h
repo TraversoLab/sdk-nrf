@@ -44,19 +44,35 @@ struct bt_mesh_sensor_srv;
  *  @brief Sensor Server model composition data entry.
  *
  *  @param[in] _srv Pointer to a @ref bt_mesh_sensor_srv instance.
+ *  @param ...      Optional Light Lightness Server metadata if application is
+ *                  compiled with Large Composition Data Server support,
+ *                  otherwise this parameter is ignored.
  */
-#define BT_MESH_MODEL_SENSOR_SRV(_srv)                                         \
-	BT_MESH_MODEL_CB(BT_MESH_MODEL_ID_SENSOR_SRV, _bt_mesh_sensor_srv_op,  \
-			 &(_srv)->pub,                                         \
+#define BT_MESH_MODEL_SENSOR_SRV(_srv, ...)                                    \
+	BT_MESH_MODEL_METADATA_CB(BT_MESH_MODEL_ID_SENSOR_SRV,                 \
+			 _bt_mesh_sensor_srv_op, &(_srv)->pub,                 \
 			 BT_MESH_MODEL_USER_DATA(struct bt_mesh_sensor_srv,    \
 						 _srv),                        \
-			 &_bt_mesh_sensor_srv_cb),                             \
+			 &_bt_mesh_sensor_srv_cb, __VA_ARGS__),                \
 	BT_MESH_MODEL_CB(BT_MESH_MODEL_ID_SENSOR_SETUP_SRV,                    \
 			 _bt_mesh_sensor_setup_srv_op,                         \
 			 &(_srv)->setup_pub,                                   \
 			 BT_MESH_MODEL_USER_DATA(struct bt_mesh_sensor_srv,    \
 					      _srv),                           \
 			 &_bt_mesh_sensor_setup_srv_cb)
+
+/** Sensor Properties Metadata ID. */
+#define BT_MESH_SENSOR_PROP_METADATA_ID 0x0001
+
+/**
+ *  Sensor Properties Metadata entry.
+ *
+ *  @param[in] ... list of 16-bit sensor property IDs split by comma.
+ */
+#define BT_MESH_SENSOR_PROP_METADATA(...)                                                          \
+	BT_MESH_MODELS_METADATA_ENTRY(2 * ARRAY_SIZE(((uint16_t[]){__VA_ARGS__})),                 \
+				      BT_MESH_SENSOR_PROP_METADATA_ID,                             \
+				      ((uint16_t[]){__VA_ARGS__}))
 
 /** Sensor server instance. */
 struct bt_mesh_sensor_srv {
@@ -94,7 +110,6 @@ struct bt_mesh_sensor_srv {
 	const struct bt_mesh_model *model;
 };
 
-#if !defined(CONFIG_BT_MESH_SENSOR_USE_LEGACY_SENSOR_VALUE) || defined(__DOXYGEN__)
 /** @brief Publish a sensor value.
  *
  *  Immediately publishes the given sensor value, without checking thresholds
@@ -117,30 +132,6 @@ int bt_mesh_sensor_srv_pub(struct bt_mesh_sensor_srv *srv,
 			   struct bt_mesh_msg_ctx *ctx,
 			   struct bt_mesh_sensor *sensor,
 			   const struct bt_mesh_sensor_value *value);
-#else /* defined(CONFIG_BT_MESH_SENSOR_USE_LEGACY_SENSOR_VALUE) */
-/** @brief Publish a sensor value.
- *
- *  Immediately publishes the given sensor value, without checking thresholds
- *  or intervals.
- *
- *  @see bt_mesh_sensor_srv_pub
- *
- *  @param[in] srv    Sensor server instance.
- *  @param[in] ctx    Message context to publish with, or NULL to publish on the
- *                    configured publish parameters.
- *  @param[in] sensor Sensor to publish with.
- *  @param[in] value  Sensor value to publish, interpreted as an array of sensor
- *                    channel values matching the sensor channels specified by
- *                    the sensor type. The length of the array must match the
- *                    sensor channel count.
- *
- *  @return 0 on success, or (negative) error code otherwise.
- */
-int bt_mesh_sensor_srv_pub(struct bt_mesh_sensor_srv *srv,
-			   struct bt_mesh_msg_ctx *ctx,
-			   struct bt_mesh_sensor *sensor,
-			   const struct sensor_value *value);
-#endif /* !defined(CONFIG_BT_MESH_SENSOR_USE_LEGACY_SENSOR_VALUE) */
 
 /** @brief Make the server to take a sample of the sensor, and publish if the
  *         value changed sufficiently.

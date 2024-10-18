@@ -228,6 +228,10 @@ static void le_audio_msg_sub_thread(void)
 
 			break;
 
+		case LE_AUDIO_EVT_STREAM_SENT:
+			/* Nothing to do. */
+			break;
+
 		default:
 			LOG_WRN("Unexpected/unhandled le_audio event: %d", msg.event);
 
@@ -367,6 +371,30 @@ static int ext_adv_populate(uint8_t big_index, struct broadcast_source_ext_adv_d
 	int ret;
 	size_t ext_adv_buf_cnt = 0;
 
+	if (IS_ENABLED(CONFIG_BT_AUDIO_USE_BROADCAST_NAME_ALT)) {
+		if (sizeof(CONFIG_BT_AUDIO_BROADCAST_NAME_ALT) >
+		    ARRAY_SIZE(ext_adv_data->brdcst_name_buf)) {
+			LOG_ERR("CONFIG_BT_AUDIO_BROADCAST_NAME_ALT is too long");
+			return -EINVAL;
+		}
+
+		size_t brdcst_name_size = sizeof(CONFIG_BT_AUDIO_BROADCAST_NAME_ALT) - 1;
+
+		memcpy(ext_adv_data->brdcst_name_buf, CONFIG_BT_AUDIO_BROADCAST_NAME_ALT,
+		       brdcst_name_size);
+	} else {
+		if (sizeof(CONFIG_BT_AUDIO_BROADCAST_NAME) >
+		    ARRAY_SIZE(ext_adv_data->brdcst_name_buf)) {
+			LOG_ERR("CONFIG_BT_AUDIO_BROADCAST_NAME is too long");
+			return -EINVAL;
+		}
+
+		size_t brdcst_name_size = sizeof(CONFIG_BT_AUDIO_BROADCAST_NAME) - 1;
+
+		memcpy(ext_adv_data->brdcst_name_buf, CONFIG_BT_AUDIO_BROADCAST_NAME,
+		       brdcst_name_size);
+	}
+
 	ext_adv_buf[ext_adv_buf_cnt].type = BT_DATA_UUID16_SOME;
 	ext_adv_buf[ext_adv_buf_cnt].data = ext_adv_data->uuid_buf->data;
 	ext_adv_buf_cnt++;
@@ -378,7 +406,11 @@ static int ext_adv_populate(uint8_t big_index, struct broadcast_source_ext_adv_d
 		return ret;
 	}
 
-	ret = broadcast_source_ext_adv_populate(big_index, ext_adv_data,
+	bool fixed_id = !IS_ENABLED(CONFIG_BT_AUDIO_USE_BROADCAST_ID_RANDOM);
+
+	uint32_t broadcast_id = CONFIG_BT_AUDIO_BROADCAST_ID_FIXED;
+
+	ret = broadcast_source_ext_adv_populate(big_index, fixed_id, broadcast_id, ext_adv_data,
 						&ext_adv_buf[ext_adv_buf_cnt],
 						ext_adv_buf_size - ext_adv_buf_cnt);
 	if (ret < 0) {
@@ -450,7 +482,7 @@ void streamctrl_send(void const *const data, size_t size, uint8_t num_ch)
 	struct le_audio_encoded_audio enc_audio = {.data = data, .size = size, .num_ch = num_ch};
 
 	if (strm_state == STATE_STREAMING) {
-		ret = broadcast_source_send(0, enc_audio);
+		ret = broadcast_source_send(0, 0, enc_audio);
 
 		if (ret != 0 && ret != prev_ret) {
 			if (ret == -ECANCELED) {
@@ -547,7 +579,7 @@ int main(void)
 	broadcast_source_default_create(&broadcast_param);
 
 	/* Only one BIG supported at the moment */
-	ret = broadcast_source_enable(&broadcast_param, 1);
+	ret = broadcast_source_enable(&broadcast_param, 0);
 	ERR_CHK_MSG(ret, "Failed to enable broadcaster(s)");
 
 	ret = audio_system_config_set(
@@ -567,6 +599,8 @@ int main(void)
 	ret = bt_mgmt_adv_start(0, ext_adv_buf[0], ext_adv_buf_cnt, &per_adv_buf[0],
 				per_adv_buf_cnt, false);
 	ERR_CHK_MSG(ret, "Failed to start first advertiser");
+
+	LOG_INF("Broadcast source: %s started", CONFIG_BT_AUDIO_BROADCAST_NAME);
 
 	return 0;
 }

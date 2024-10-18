@@ -91,7 +91,7 @@ config THREAD_WIFI_SWITCHING
 	depends on SOC_SERIES_NRF53X
 	depends on NET_L2_OPENTHREAD
 	depends on CHIP_WIFI
-	depends on !CHIP_FACTORY_RESET_ERASE_NVS
+	depends on !CHIP_FACTORY_RESET_ERASE_SETTINGS
 	select EXPERIMENTAL
 	help
 	  Build the application with both Thread and Wi-Fi support and initialize
@@ -142,11 +142,36 @@ endif # CHIP_WIFI
 config NCS_SAMPLE_MATTER_PERSISTENT_STORAGE
 	default y
 
+# PSA SSF Crypto Client is not ready for the secure storage backend
+if !PSA_SSF_CRYPTO_CLIENT
+
 config NCS_SAMPLE_MATTER_SECURE_STORAGE_BACKEND
 	default y if !CHIP_WIFI
 
 config NCS_SAMPLE_MATTER_SETTINGS_STORAGE_BACKEND
 	default n if !CHIP_WIFI
+
+endif
+
+# Increase the storage capacity if the schedules are enabled with secure storage
+# This also implies increasing of the OT and Matter stacks because some operations
+# performed during commissioning seem to allocate stack buffers based on the
+# maximum possible secure asset size.
+if LOCK_SCHEDULES && NCS_SAMPLE_MATTER_SECURE_STORAGE_BACKEND
+
+config NCS_SAMPLE_MATTER_SECURE_STORAGE_MAX_ENTRY_NUMBER
+	default 128
+
+config TRUSTED_STORAGE_BACKEND_AEAD_MAX_DATA_SIZE
+	default 3072
+
+config OPENTHREAD_THREAD_STACK_SIZE
+	default 5120
+
+config CHIP_TASK_STACK_SIZE
+	default 9216
+
+endif
 
 source "${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/nrfconnect/chip-module/Kconfig.features"
 source "${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/nrfconnect/chip-module/Kconfig.defaults"

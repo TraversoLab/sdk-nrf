@@ -664,6 +664,11 @@ static int clock_init(void)
 		}
 	} while (err);
 
+#if defined(NRF54L15_XXAA)
+	/* MLTPAN-20 */
+	nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_PLLSTART);
+#endif /* defined(NRF54L15_XXAA) */
+
 	return err;
 }
 #endif /* defined(CONFIG_CLOCK_CONTROL_NRF) */
@@ -741,6 +746,11 @@ static nrf_radio_txpower_t dbm_to_nrf_radio_txpower(int8_t tx_power)
 	 * to the appropriate radio register enumerator.
 	 */
 	switch (tx_power) {
+#if defined(RADIO_TXPOWER_TXPOWER_Neg100dBm)
+	case -100:
+		return RADIO_TXPOWER_TXPOWER_Neg100dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg100dBm) */
+
 #if defined(RADIO_TXPOWER_TXPOWER_Neg70dBm)
 	case -70:
 		return RADIO_TXPOWER_TXPOWER_Neg70dBm;
@@ -761,13 +771,23 @@ static nrf_radio_txpower_t dbm_to_nrf_radio_txpower(int8_t tx_power)
 		return RADIO_TXPOWER_TXPOWER_Neg30dBm;
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg30dBm) */
 
-#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm)
-	case -26:
-		return RADIO_TXPOWER_TXPOWER_Neg26dBm;
-#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) */
+#if defined(RADIO_TXPOWER_TXPOWER_Neg28dBm)
+	case -28:
+		return RADIO_TXPOWER_TXPOWER_Neg28dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg28dBm) */
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg22dBm)
+	case -22:
+		return RADIO_TXPOWER_TXPOWER_Neg22dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg22dBm) */
 
 	case -20:
 		return RADIO_TXPOWER_TXPOWER_Neg20dBm;
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg18dBm)
+	case -18:
+		return RADIO_TXPOWER_TXPOWER_Neg18dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg18dBm) */
 
 	case -16:
 		return RADIO_TXPOWER_TXPOWER_Neg16dBm;
@@ -1088,6 +1108,12 @@ int dtm_init(dtm_iq_report_callback_t callback)
 		return err;
 	}
 #endif /* defined(CONFIG_CLOCK_CONTROL_NRF) */
+
+#if defined(CONFIG_SOC_SERIES_NRF54HX)
+	/* Apply HMPAN-102 workaround for nRF54H series */
+	*(volatile uint32_t *)0x5302C7E4 =
+				(((*((volatile uint32_t *)0x5302C7E4)) & 0xFF000FFF) | 0x0012C000);
+#endif
 
 	err = timer_init();
 	if (err) {
@@ -1744,8 +1770,8 @@ static uint32_t dtm_packet_interval_calculate(uint32_t test_payload_length,
 	uint32_t overhead_bits = 0;
 
 	/* Packet overhead
-	 * see BLE [Vol 6, Part F] page 213
-	 * 4.1 LE TEST PACKET FORMAT
+	 * see Bluetooth Core Specification [Vol 6, Part F]
+	 * Section 4.1 LE TEST PACKET FORMAT
 	 */
 	if (mode == NRF_RADIO_MODE_BLE_2MBIT) {
 		/* 16 preamble
@@ -2292,8 +2318,8 @@ int dtm_test_transmit(uint8_t channel, uint8_t length, enum dtm_packet pkt)
 	radio_prepare(TX_MODE);
 
 	/* Set the timer to the correct period. The delay between each
-	 * packet is described in the Bluetooth Core Spsification
-	 * version 4.2 Vol. 6 Part F Section 4.1.6.
+	 * packet is described in the Bluetooth Core Specification,
+	 * Vol. 6 Part F Section 4.1.6.
 	 */
 	nrfx_timer_extended_compare(&dtm_inst.timer, NRF_TIMER_CC_CHANNEL0,
 			dtm_packet_interval_calculate(dtm_inst.packet_len, dtm_inst.radio_mode),

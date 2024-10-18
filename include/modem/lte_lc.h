@@ -209,40 +209,41 @@ enum lte_lc_evt_type {
 	/**
 	 * Network registration status.
 	 *
-	 * The associated payload is the @c nw_reg_status member of type @ref lte_lc_nw_reg_status
-	 * in the event.
+	 * The associated payload is the @c lte_lc_evt.nw_reg_status member of type
+	 * @ref lte_lc_nw_reg_status in the event.
 	 */
 	LTE_LC_EVT_NW_REG_STATUS,
 
 	/**
 	 * PSM parameters provided by the network.
 	 *
-	 * The associated payload is the @c psm_cfg member of type @ref lte_lc_psm_cfg in the event.
+	 * The associated payload is the @c lte_lc_evt.psm_cfg member of type
+	 * @ref lte_lc_psm_cfg in the event.
 	 */
 	LTE_LC_EVT_PSM_UPDATE,
 
 	/**
 	 * eDRX parameters provided by the network.
 	 *
-	 * The associated payload is the @c edrx_cfg member of type @ref lte_lc_edrx_cfg in the
-	 * event.
+	 * The associated payload is the @c lte_lc_evt.edrx_cfg member of type
+	 * @ref lte_lc_edrx_cfg in the event.
 	 */
 	LTE_LC_EVT_EDRX_UPDATE,
 
 	/**
 	 * RRC connection state.
 	 *
-	 * The associated payload is the @c rrc_mode member of type @ref lte_lc_rrc_mode in the
-	 * event.
+	 * The associated payload is the @c lte_lc_evt.rrc_mode member of type
+	 * @ref lte_lc_rrc_mode in the event.
 	 */
 	LTE_LC_EVT_RRC_UPDATE,
 
 	/**
 	 * Current cell.
 	 *
-	 * The associated payload is the @c cell member of type @ref lte_lc_cell in the event.
-	 * Only the @c cell.tac and @c cell.id members are populated in the event payload. The rest
-	 * are expected to be zero.
+	 * The associated payload is the @c lte_lc_evt.cell member of type
+	 * @ref lte_lc_cell in the event. Only the @c lte_lc_cell.tac and @c lte_lc_cell.id
+	 * members are populated in the event payload. The rest are expected to be zero.
 	 */
 	LTE_LC_EVT_CELL_UPDATE,
 
@@ -254,8 +255,8 @@ enum lte_lc_evt_type {
 	 * availability. This event will then indicate which LTE mode is currently used by the
 	 * modem.
 	 *
-	 * The associated payload is the @c lte_mode member of type @ref lte_lc_lte_mode in the
-	 * event.
+	 * The associated payload is the @c lte_lc_evt.lte_mode member of type
+	 * @ref lte_lc_lte_mode in the event.
 	 */
 	LTE_LC_EVT_LTE_MODE_UPDATE,
 
@@ -267,15 +268,15 @@ enum lte_lc_evt_type {
 	 * before the TAU happens, thus saving power by avoiding sending data and the TAU
 	 * separately.
 	 *
-	 * The associated payload is the @c time member of type @c uint64_t in the event.
+	 * The associated payload is the @c lte_lc_evt.time member of type @c uint64_t in the event.
 	 */
 	LTE_LC_EVT_TAU_PRE_WARNING,
 
 	/**
 	 * Neighbor cell measurement results.
 	 *
-	 * The associated payload is the @c cells_info member of type @ref lte_lc_cells_info in the
-	 * event.
+	 * The associated payload is the @c lte_lc_evt.cells_info member of type
+	 * @ref lte_lc_cells_info in the event.
 	 */
 	LTE_LC_EVT_NEIGHBOR_CELL_MEAS,
 
@@ -285,34 +286,46 @@ enum lte_lc_evt_type {
 	 * This event will be received some time before the modem exits sleep. The time is
 	 * configurable.
 	 *
-	 * The associated payload is the @c modem_sleep member of type @ref lte_lc_modem_sleep in
-	 * the event. The @c time parameter indicates the time until modem exits sleep.
+	 * The associated payload is the @c lte_lc_evt.modem_sleep member of type
+	 * @ref lte_lc_modem_sleep in the event. The @c lte_lc_modem_sleep.time parameter indicates
+	 * the time until modem exits sleep.
 	 */
 	LTE_LC_EVT_MODEM_SLEEP_EXIT_PRE_WARNING,
 
 	/**
 	 * Modem exited from sleep.
 	 *
-	 * The associated payload is the @c modem_sleep member of type @ref lte_lc_modem_sleep in
-	 * the event.
+	 * The associated payload is the @c lte_lc_evt.modem_sleep member of type
+	 * @ref lte_lc_modem_sleep in the event.
 	 */
 	LTE_LC_EVT_MODEM_SLEEP_EXIT,
 
 	/**
 	 * Modem entered sleep.
 	 *
-	 * The associated payload is the @c modem_sleep member of type @ref lte_lc_modem_sleep in
-	 * the event. The @c time parameter indicates the duration of the sleep.
+	 * The associated payload is the @c lte_lc_evt.modem_sleep member of type
+	 * @ref lte_lc_modem_sleep in the event. The @c lte_lc_modem_sleep.time parameter indicates
+	 * the duration of the sleep.
 	 */
 	LTE_LC_EVT_MODEM_SLEEP_ENTER,
 
 	/**
 	 * Information about modem operation.
 	 *
-	 * The associated payload is the @c modem_evt member of type @ref lte_lc_modem_evt in the
-	 * event.
+	 * The associated payload is the @c lte_lc_evt.modem_evt member of type
+	 * @ref lte_lc_modem_evt in the event.
 	 */
 	LTE_LC_EVT_MODEM_EVENT,
+
+	/**
+	 * Information about RAI (Release Assistance Indication) configuration.
+	 *
+	 * The associated payload is the @c lte_lc_evt.rai_cfg member of type
+	 * @ref lte_lc_rai_cfg in the event.
+	 *
+	 * @note This event is only supported by modem firmware versions >= 2.0.2.
+	 */
+	LTE_LC_EVT_RAI_UPDATE,
 };
 
 /** RRC connection state. */
@@ -386,14 +399,14 @@ struct lte_lc_ncell {
 	/**
 	 * RSRP.
 	 *
-	 * Format is the same as for @c rsrp member of struct @ref lte_lc_cell.
+	 * Format is the same as for @c lte_lc_cell.rsrp member.
 	 */
 	int16_t rsrp;
 
 	/**
 	 * RSRQ.
 	 *
-	 * Format is the same as for @c rsrq member of struct @ref lte_lc_cell.
+	 * Format is the same as for @c lte_lc_cell.rsrq member.
 	 */
 	int16_t rsrq;
 };
@@ -453,13 +466,15 @@ struct lte_lc_cell {
 	/**
 	 * RSRP.
 	 *
+	 * Can be converted into dBm using @ref RSRP_IDX_TO_DBM macro.
+	 *
 	 * * -17: RSRP < -156 dBm
 	 * * -16: -156 ≤ RSRP < -155 dBm
 	 * * ...
 	 * * -3: -143 ≤ RSRP < -142 dBm
 	 * * -2: -142 ≤ RSRP < -141 dBm
 	 * * -1: -141 ≤ RSRP < -140 dBm
-	 * * 0: RSRP < -140 dBm
+	 * * 0: Not used.
 	 * * 1: -140 ≤ RSRP < -139 dBm
 	 * * 2: -139 ≤ RSRP < -138 dBm
 	 * * ...
@@ -473,12 +488,14 @@ struct lte_lc_cell {
 	/**
 	 * RSRQ.
 	 *
-	 * * -30: RSRQ < -34 dB
+	 * Can be converted into dB using @ref RSRQ_IDX_TO_DB macro.
+	 *
+	 * * -30: RSRQ < -34.5 dB
 	 * * -29: -34 ≤ RSRQ < -33.5 dB
 	 * * ...
 	 * * -2: -20.5 ≤ RSRQ < -20 dB
 	 * * -1: -20 ≤ RSRQ < -19.5 dB
-	 * * 0: RSRQ < -19.5 dB
+	 * * 0: Not used.
 	 * * 1: -19.5 ≤ RSRQ < -19 dB
 	 * * 2: -19 ≤ RSRQ < -18.5 dB
 	 * * ...
@@ -635,7 +652,10 @@ enum lte_lc_ce_level {
 	LTE_LC_CE_LEVEL_UNKNOWN	= UINT8_MAX,
 };
 
-/** Reduced mobility mode. */
+/** Reduced mobility mode.
+ *
+ *  @deprecated since v2.8.0.
+ */
 enum lte_lc_reduced_mobility_mode {
 	/** Functionality according to the 3GPP relaxed monitoring feature. */
 	LTE_LC_REDUCED_MOBILITY_DEFAULT = 0,
@@ -725,13 +745,31 @@ enum lte_lc_modem_evt {
 	LTE_LC_MODEM_EVT_CE_LEVEL_3,
 };
 
-/** Type of factory reset to perform. */
+/**
+ * Type of factory reset to perform.
+ *
+ * @deprecated since v2.8.0.
+ */
 enum lte_lc_factory_reset_type {
 	/** Reset all modem data to factory settings. */
 	LTE_LC_FACTORY_RESET_ALL = 0,
 
 	/** Reset user-configurable data to factory settings. */
 	LTE_LC_FACTORY_RESET_USER = 1,
+};
+
+/** RAI configuration. */
+struct lte_lc_rai_cfg {
+	/** E-UTRAN cell ID. */
+	uint32_t cell_id;
+	/** Mobile Country Code. */
+	int mcc;
+	/** Mobile Network Code. */
+	int mnc;
+	/** AS RAI support. */
+	bool as_rai;
+	/** CP RAI support. */
+	bool cp_rai;
 };
 
 /**
@@ -780,13 +818,15 @@ struct lte_lc_conn_eval_params {
 	/**
 	 * Current RSRP level at time of report.
 	 *
+	 * Can be converted into dBm using @ref RSRP_IDX_TO_DBM macro.
+	 *
 	 * * -17: RSRP < -156 dBm
 	 * * -16: -156 ≤ RSRP < -155 dBm
 	 * * ...
 	 * * -3: -143 ≤ RSRP < -142 dBm
 	 * * -2: -142 ≤ RSRP < -141 dBm
 	 * * -1: -141 ≤ RSRP < -140 dBm
-	 * * 0: RSRP < -140 dBm
+	 * * 0: Not used.
 	 * * 1: -140 ≤ RSRP < -139 dBm
 	 * * 2: -139 ≤ RSRP < -138 dBm
 	 * * ...
@@ -800,12 +840,14 @@ struct lte_lc_conn_eval_params {
 	/**
 	 * Current RSRQ level at time of report.
 	 *
+	 * Can be converted into dB using @ref RSRQ_IDX_TO_DB macro.
+	 *
 	 * * -30: RSRQ < -34 dB
 	 * * -29: -34 ≤ RSRQ < -33.5 dB
 	 * * ...
 	 * * -2: -20.5 ≤ RSRQ < -20 dB
 	 * * -1: -20 ≤ RSRQ < -19.5 dB
-	 * * 0: RSRQ < -19.5 dB
+	 * * 0: Not used.
 	 * * 1: -19.5 ≤ RSRQ < -19 dB
 	 * * 2: -19 ≤ RSRQ < -18.5 dB
 	 * * ...
@@ -1151,6 +1193,8 @@ struct lte_lc_cfun_cb {
  * @param name Callback name.
  * @param _callback Callback function.
  * @param _context User-defined context.
+ *
+ * @deprecated since v2.8.0, use @ref NRF_MODEM_LIB_ON_CFUN instead.
  */
 #define LTE_LC_ON_CFUN(name, _callback, _context)                                                  \
 	static void _callback(enum lte_lc_func_mode, void *ctx);                                   \
@@ -1201,6 +1245,9 @@ struct lte_lc_evt {
 
 		/** Payload for event @ref LTE_LC_EVT_NEIGHBOR_CELL_MEAS. */
 		struct lte_lc_cells_info cells_info;
+
+		/** Payload for event @ref LTE_LC_EVT_RAI_UPDATE. */
+		struct lte_lc_rai_cfg rai_cfg;
 	};
 };
 
@@ -1230,19 +1277,6 @@ void lte_lc_register_handler(lte_lc_evt_handler_t handler);
 int lte_lc_deregister_handler(lte_lc_evt_handler_t handler);
 
 /**
- * Initialize the library and configure the modem.
- *
- * @deprecated There is no need to call this function anymore.
- *
- * @note A follow-up call to lte_lc_connect() or lte_lc_connect_async() must be made to establish
- *       an LTE connection. The library can be initialized only once, and subsequent calls will
- *       return @c 0.
- *
- * @retval 0 if successful.
- */
-__deprecated int lte_lc_init(void);
-
-/**
  * Connect to LTE network.
  *
  *
@@ -1256,24 +1290,6 @@ __deprecated int lte_lc_init(void);
  * @retval -EINPROGRESS if a connection establishment attempt is already in progress.
  */
 int lte_lc_connect(void);
-
-/**
- * Initialize the library, configure the modem and connect to LTE network.
- *
- * @deprecated Use @ref lte_lc_connect instead.
- *
- * The function blocks until connection is established, or the connection attempt times out.
- *
- * @note The library can be initialized only once, and repeated calls will return @c 0.
- *       lte_lc_connect_async() should be used on subsequent calls.
- *
- * @retval 0 if successful.
- * @retval -EFAULT if an AT command failed.
- * @retval -ETIMEDOUT if a connection attempt timed out before the device was
- *	   registered to a network.
- * @retval -EINPROGRESS if a connection establishment attempt is already in progress.
- */
-__deprecated int lte_lc_init_and_connect(void);
 
 /**
  * Connect to LTE network.
@@ -1290,35 +1306,6 @@ __deprecated int lte_lc_init_and_connect(void);
  * @retval -EFAULT if an AT command failed.
  */
 int lte_lc_connect_async(lte_lc_evt_handler_t handler);
-
-/**
- * Initialize the library, configure the modem and connect to LTE network.
- *
- * @deprecated Use @ref lte_lc_connect_async instead.
- *
- * The function returns immediately.
- *
- * @note The library can be initialized only once, and repeated calls will return @c 0.
- *       lte_lc_connect() should be used on subsequent calls.
- *
- * @param[in] handler Event handler for receiving LTE events. The parameter can be @c NULL if an
- *                    event handler is already registered.
- *
- * @retval 0 if successful.
- * @retval -EFAULT if an AT command failed.
- * @retval -EINVAL if no event handler was registered.
- */
-__deprecated int lte_lc_init_and_connect_async(lte_lc_evt_handler_t handler);
-
-/**
- * Deinitialize the library and power off the modem.
- *
- * @deprecated Use @ref lte_lc_power_off instead.
- *
- * @retval 0 if successful.
- * @retval -EFAULT if an AT command failed.
- */
-__deprecated int lte_lc_deinit(void);
 
 /**
  * Set the modem to offline mode.
@@ -1663,6 +1650,7 @@ int lte_lc_lte_mode_get(enum lte_lc_lte_mode *mode);
  *
  * @retval 0 if neighbor cell measurement was successfully initiated.
  * @retval -EFAULT if AT command failed.
+ * @retval -EINVAL if parameters are invalid.
  * @retval -EINPROGRESS if a neighbor cell measurement is already in progress.
  */
 int lte_lc_neighbor_cell_measurement(struct lte_lc_ncellmeas_params *params);
@@ -1784,6 +1772,8 @@ int lte_lc_periodic_search_request(void);
  * @retval 0 if a mode was found and written to the provided pointer.
  * @retval -EINVAL if input parameter was @c NULL.
  * @retval -EFAULT if an AT command failed.
+ *
+ * @deprecated since v2.8.0.
  */
 int lte_lc_reduced_mobility_get(enum lte_lc_reduced_mobility_mode *mode);
 
@@ -1796,6 +1786,8 @@ int lte_lc_reduced_mobility_get(enum lte_lc_reduced_mobility_mode *mode);
  *
  * @retval 0 if the new reduced mobility mode was accepted by the modem.
  * @retval -EFAULT if an AT command failed.
+ *
+ * @deprecated since v2.8.0.
  */
 int lte_lc_reduced_mobility_set(enum lte_lc_reduced_mobility_mode mode);
 
@@ -1810,6 +1802,8 @@ int lte_lc_reduced_mobility_set(enum lte_lc_reduced_mobility_mode mode);
  *
  * @retval 0 if factory reset was performed successfully.
  * @retval -EFAULT if an AT command failed.
+ *
+ * @deprecated since v2.8.0.
  */
 int lte_lc_factory_reset(enum lte_lc_factory_reset_type type);
 

@@ -9,10 +9,11 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp/ns
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp nrf54l15dk/nrf54l15/cpuapp/ns
+    tags: sysbuild ci_samples_matter
   sample.matter.light_switch.release:
     sysbuild: true
     build_only: true
@@ -22,10 +23,10 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
   sample.matter.light_switch.lto:
     sysbuild: true
     build_only: true
@@ -34,20 +35,30 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
+  sample.matter.light_switch.lit_icd:
+    sysbuild: true
+    build_only: true
+    extra_args: light_switch_SNIPPET=lit_icd
+    integration_platforms:
+      - nrf52840dk/nrf52840
+      - nrf5340dk/nrf5340/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
+    platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
   # Sample to execute load tests
   sample.matter.light_switch.persistent_subscriptions:
     sysbuild: true
     build_only: true
     extra_args: CONFIG_CHIP_PERSISTENT_SUBSCRIPTIONS=y
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
+      nrf54l15dk/nrf54l15/cpuapp
     integration_platforms:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      - nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter

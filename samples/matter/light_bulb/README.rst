@@ -39,7 +39,7 @@ IPv6 network support
 
 The development kits for this sample offer the following IPv6 network support for Matter:
 
-* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, and ``nrf54l15pdk/nrf54l15/cpuapp``.
+* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, and ``nrf54l15dk/nrf54l15/cpuapp``.
 * Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002ek`` shield attached or for ``nrf7002dk/nrf5340/cpuapp``.
 
 Overview
@@ -110,6 +110,13 @@ The sample supports the following configurations:
 
 .. matter_light_bulb_sample_configuration_file_types_end
 
+Matter light bulb with Trusted Firmware-M
+=========================================
+
+.. include:: ../template/README.rst
+    :start-after: matter_template_build_with_tfm_start
+    :end-before: matter_template_build_with_tfm_end
+
 Device Firmware Upgrade support
 ===============================
 
@@ -165,6 +172,7 @@ To set up an AWS IoT instance and configure the sample, complete the following s
 
    The certificates will vary in size depending on the method you chose when generating the certificates.
    Due to this, you might need to increase the value of the :kconfig:option:`CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN` option to be able to establish a connection.
+#. |open_terminal_window_with_environment|
 #. Build the sample using the following command:
 
    .. code-block:: console

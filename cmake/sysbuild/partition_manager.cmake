@@ -46,6 +46,10 @@ function(partition_manager)
 
   sysbuild_get(${image_name}_APPLICATION_CONFIG_DIR IMAGE ${image_name} VAR APPLICATION_CONFIG_DIR CACHE)
 
+  if(DEFINED user_def_pm_static AND NOT IS_ABSOLUTE ${user_def_pm_static})
+    set(user_def_pm_static "${${image_name}_APPLICATION_CONFIG_DIR}/${user_def_pm_static}")
+  endif()
+
   ncs_file(CONF_FILES ${${image_name}_APPLICATION_CONFIG_DIR}
            PM conf_dir_pm_static
            DOMAIN ${DOMAIN}
@@ -71,16 +75,30 @@ function(partition_manager)
                    "${static_configuration_file}"
     )
     set(static_configuration --static-config ${static_configuration_file})
-  endif()
 
-  if (NOT static_configuration AND CONFIG_PM_IMAGE_NOT_BUILT_FROM_SOURCE)
-    message(WARNING
-      "One or more child image is not configured to be built from source. \
-      However, there is no static configuration provided to the \
-      partition manager. Please provide a static configuration as described in \
-      the 'Scripts -> Partition Manager -> Static configuration' chapter in the \
-      documentation. Without this information, the build system is not able to \
-      place the image correctly in flash.")
+    # Generate an MD5 of the configuration and check if it matches the existing one, alert the
+    # user with a warning to do a pristine build if it differs to avoid having stale
+    # configuration used for MCUboot images
+    file(MD5 ${static_configuration_file} static_configuration_checksum)
+    if(NOT DEFINED STATIC_PM_FILE_HASH OR NOT "${STATIC_PM_FILE_HASH}" STREQUAL "${static_configuration_checksum}")
+      if(DEFINED STATIC_PM_FILE_HASH)
+        message(WARNING "Static partition manager file has changed since this project was last configured, "
+                        "this may cause images to use the original static partition manager file "
+                        "configuration data, which is incorrect. It is recommended that a pristine build be "
+                        "performed when a static partition manager file is updated."
+        )
+      endif()
+
+      set(STATIC_PM_FILE_HASH "${static_configuration_checksum}" CACHE INTERNAL
+          "nRF Connect SDK static partition manager file hash" FORCE
+      )
+    endif()
+
+    # Add a watch on this static PM file for changes so a CMake reconfigure occurs
+    set_property(DIRECTORY APPEND PROPERTY
+                 CMAKE_CONFIGURE_DEPENDS
+                 ${static_configuration_file}
+    )
   endif()
 
   if(NOT "${PM_DOMAIN}" STREQUAL "CPUNET" AND NOT static_configuration AND
@@ -99,8 +117,7 @@ function(partition_manager)
     )
   endif()
 
-# We must set this when running for the domain, so how is the domain name partition handled in settings ?
-  if("${PM_DOMAIN}" STREQUAL "CPUNET")
+  if(NOT "${PM_DOMAIN}" STREQUAL "")
     set(dynamic_partition ${${PM_DOMAIN}_PM_DOMAIN_DYNAMIC_PARTITION})
     set(
       dynamic_partition_argument
@@ -465,16 +482,17 @@ foreach (image ${IMAGES})
   endif()
 endforeach()
 
-#foreach (image ${IMAGES})
-#    # Re-configure (Re-execute all CMakeLists.txt code) when original
-#    # (not preprocessed) configuration file changes.
-#  #  get_shared(dependencies IMAGE ${image} PROPERTY PM_YML_DEP_FILES)
-#  #  set_property(
-#  #    DIRECTORY APPEND PROPERTY
-#  #    CMAKE_CONFIGURE_DEPENDS
-#  #    ${dependencies}
-#  #    )
-#endforeach()
+foreach (image ${IMAGES})
+  # Re-configure (Re-execute all CMakeLists.txt code) when original
+  # (not preprocessed) configuration file changes.
+  sysbuild_get(${image}_pm_yml_dep_files IMAGE ${image} VAR PM_YML_DEP_FILES CACHE)
+
+  set_property(
+    DIRECTORY APPEND PROPERTY
+    CMAKE_CONFIGURE_DEPENDS
+    ${image}_pm_yml_dep_files
+    )
+endforeach()
 
 list(APPEND input_files  ${${DEFAULT_IMAGE}_binary_dir}/${generated_path}/pm.yml)
 

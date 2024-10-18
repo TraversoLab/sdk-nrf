@@ -75,9 +75,6 @@ config SB_SIGNING_KEY_FILE
 	  Specifies the private key used for signing the firmware image.
 	  The hash of the corresponding public key is stored as the first
 	  entry in the list of public key hashes in the provision hex file.
-	  This value can also be set by exporting an environment variable
-	  named 'SB_SIGNING_KEY_FILE' or passing
-	  '-DSB_SIGNING_KEY_FILE=/path/to/my/pem' when running cmake.
 	  See also SB_PUBLIC_KEY_FILES.
 
 config SB_SIGNING_COMMAND
@@ -200,42 +197,18 @@ menuconfig IS_SECURE_BOOTLOADER
 	select SECURE_BOOT_VALIDATION
 	select SECURE_BOOT_STORAGE
 	select SW_VECTOR_RELAY if SOC_SERIES_NRF51X
-	select NRFX_NVMC
+	imply NRFX_NVMC
 	help
 	  This option is set by the first stage bootloader app to include all
 	  files and set all the options required.
 
 if IS_SECURE_BOOTLOADER
 
-menuconfig SECURE_BOOT_DEBUG
-	bool "Printing"
-	select NCS_BOOT_BANNER
-	select PRINTK
-	select CONSOLE
-	select SERIAL
-
-if SECURE_BOOT_DEBUG
-choice SECURE_BOOT_DEBUG_BACKEND
-	prompt "Where to print to"
-	default SECURE_BOOT_DEBUG_UART
-
-config SECURE_BOOT_DEBUG_UART
-	bool "Print to UART"
-	select UART_NRFX
-	select UART_CONSOLE
-
-config SECURE_BOOT_DEBUG_RTT
-	bool "Print to RTT"
-	select RTT_CONSOLE
-	select USE_SEGGER_RTT
-endchoice
-
 config SB_BPROT_IN_DEBUG
 	bool "Enable block protect in debug"
 	default y
 	depends on (HAS_HW_NRF_BPROT || HAS_HW_NRF_MPU)
 
-endif # SECURE_BOOT_DEBUG
 endif # IS_SECURE_BOOTLOADER
 
 config IS_BOOTLOADER_IMG
@@ -264,5 +237,10 @@ config NRF53_ENFORCE_IMAGE_VERSION_EQUALITY
 rsource "bl_crypto/Kconfig"
 rsource "bl_validation/Kconfig"
 rsource "bl_storage/Kconfig"
+
+config MCUBOOT_COMPRESSED_IMAGE_SUPPORT_ENABLED
+	bool "MCUboot compressed image support"
+	help
+	  This is a Kconfig which is informative only, the value should not be changed.
 
 endmenu

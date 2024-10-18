@@ -159,6 +159,13 @@ static int fp_storage_clock_reset_perform(void)
 	int err;
 	bool was_enabled = is_enabled;
 
+	if (was_enabled) {
+		err = fp_storage_clock_uninit();
+		if (err) {
+			return err;
+		}
+	}
+
 	err = settings_delete(SETTINGS_CLOCK_FULL_NAME);
 	if (err) {
 		LOG_ERR("FP Storage Clock: settings_delete failed: %d", err);
@@ -177,11 +184,6 @@ static int fp_storage_clock_reset_perform(void)
 	return 0;
 }
 
-static void fp_storage_clock_reset_prepare(void)
-{
-	/* intentionally left empty */
-}
-
 SETTINGS_STATIC_HANDLER_DEFINE(fp_storage_clock,
 			       SETTINGS_CLOCK_SUBTREE_NAME,
 			       NULL,
@@ -191,6 +193,5 @@ SETTINGS_STATIC_HANDLER_DEFINE(fp_storage_clock,
 
 FP_STORAGE_MANAGER_MODULE_REGISTER(fp_storage_clock,
 				   fp_storage_clock_reset_perform,
-				   fp_storage_clock_reset_prepare,
 				   fp_storage_clock_init,
 				   fp_storage_clock_uninit);

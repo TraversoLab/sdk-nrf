@@ -100,7 +100,7 @@ Testing
 
               tx_pkt_tput_mode = 0
               tx_pkt_sgi = 0
-              tx_pkt_preamble = 1
+              tx_pkt_preamble = 0
               tx_pkt_mcs = 0
               tx_pkt_rate = 6
               tx_pkt_gap = 0
@@ -111,7 +111,7 @@ Testing
               phy_calib_txiq = 1
               tx_pkt_num = -1
               tx_pkt_len = 1400
-              tx_power = 0
+              tx_power = 30
               he_ltf = 2
               he_gi = 2
               xo_val = 42
@@ -120,12 +120,14 @@ Testing
               rx = 0
               tx_tone_freq = 0
               rx_lna_gain = 0
-              rx_lna_gain = 0
+              rx_bb_gain = 0
               rx_capture_length = 0
               wlan_ant_switch_ctrl = 0
               tx_pkt_cw = 15
               reg_domain = 00
-              bypass_reg_domian = 0
+              bypass_reg_domain = 0
+              ru_tone = 26
+              ru_index = 1
 
          * To run a continuous Orthogonal frequency-division multiplexing (OFDM) TX traffic sequence with the following configuration:
 
@@ -185,7 +187,7 @@ Testing
            .. code-block:: console
 
               wifi_radio_test init 14
-              wifi_radio_test tx_pkt_preamble 1
+              wifi_radio_test tx_pkt_preamble 0
               wifi_radio_test tx_pkt_rate 1
               wifi_radio_test tx_pkt_len 1024
               wifi_radio_test tx_power 10
@@ -475,6 +477,7 @@ Testing
 
               wifi_radio_test init 144
               wifi_radio_test rx_capture_length 64
+              wifi_radio_test rx_capture_timeout 10
               wifi_radio_test rx_cap 2
 
            The sample shows the following output:
@@ -493,6 +496,11 @@ Testing
               FDDF45
               07CF3D
 
+           Packet detection does not take place in a clean RF environment, producing the following output:
+
+           .. code-block:: console
+
+              ************* Packet detection failed ***********
 
          .. note::
 
@@ -504,7 +512,51 @@ Testing
               The captured samples will vary from run to run.
             * The capture is taken after WLAN packet detection, so it will not have the first few samples in the first WLAN packet.
             * Smaller packets should be used so that multiple packets can be seen in the capture.
+            * Packet detection does not take place in a clean RF environment.
+            * The command will timeout if no packets are detected within set timeout period.
 
+         * To set a regulatory domain with the following configuration:
+
+           * Regulatory domain: US
+
+           Execute the following command:
+
+           .. code-block:: console
+
+              wifi_radio_test reg_domain US
+
+           The sample shows the following output:
+
+           .. code-block:: console
+
+              wifi_radio_test show_config
+              reg_domain = US
+
+         .. note::
+
+            The default regulatory domain is ``00`` (world regulatory).
+
+         * To bypass regulatory domain, set ``bypass_reg_domain`` to ``1`` using the following command:
+
+           .. code-block:: console
+
+              wifi_radio_test bypass_reg_domain 1
+
+           The sample shows the following output:
+
+           .. code-block:: console
+
+               wifi_radio_test show_config
+               reg_domain = US
+               bypass_reg_domain = 1
+
+         .. note::
+
+            Bypass regulatory domain is false by default.
+
+            If ``bypass_reg_domain`` is ``0``, then TX power of the channel will be configured to the minimum value of the user configured TX power value and maximum power supported in the configured regulatory domain.
+
+            If ``bypass_reg_domain`` is ``1``, then user configured TX power value will be set overriding current configured regulatory domain maximum TX power for the channel.
 
       .. group-tab:: FICR/OTP programming
 
@@ -587,50 +639,6 @@ Testing
               [00:24:25.202,575] <inf> otp_prog: mac addr 0 : Reg2 (0x12c) = 0x4a00
               [00:24:25.202,606] <inf> otp_prog: Written REGION_DEFAULTS (0x154) : 0xfffffffb
               [00:24:25.203,002] <inf> otp_prog: Finished Writing OTP params
-
-
-         * To set a regulatory domain with the following configuration:
-
-           * Regulatory domain: US
-
-           Execute the following command:
-
-           .. code-block:: console
-
-              wifi_radio_test reg_domain US
-
-           The sample shows the following output:
-
-           .. code-block:: console
-
-              wifi_radio_test show_config
-              reg_domain = US
-
-         .. note::
-
-            The default regulatory domain is ``00`` (world regulatory).
-
-         * To bypass regulatory domain, set ``bypass_reg_domain`` to ``1`` using the following command:
-
-           .. code-block:: console
-
-              wifi_radio_test bypass_reg_domain 1
-
-           The sample shows the following output:
-
-           .. code-block:: console
-
-               wifi_radio_test show_config
-               reg_domain = US
-               bypass_reg_domain = 1
-
-         .. note::
-
-            Bypass regulatory domain is false by default.
-
-            If ``bypass_reg_domain`` is ``0``, then TX power of the channel will be configured to the minimum value of the user configured TX power value and maximum power supported in the configured regulatory domain.
-
-            If ``bypass_reg_domain`` is ``1``, then user configured TX power value will be set overriding current configured regulatory domain maximum TX power for the channel.
 
          See :ref:`wifi_radio_ficr_prog_subcmds` for a list of available subcommands.
 

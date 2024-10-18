@@ -218,6 +218,14 @@ config TEST_COUNTER
 	help
 	  When enabled, the test counter configuration setting in the shadow is ignored.
 
+config TEST_COUNTER_MULTIPLIER
+	int "The number of test counter messages sent on each update"
+	default 1
+	range 1 1000
+	help
+	  This is a way to increase the number of device messages sent by the sample.
+	  It is useful for load testing.
+
 config AT_CMD_REQUESTS
 	depends on !NRF_CLOUD_COAP
 	bool "Enables remote execution of AT commands using device messages"
@@ -230,6 +238,19 @@ config AT_CMD_REQUEST_RESPONSE_BUFFER_LENGTH
 	  nRF Cloud. If a response from the modem exceeds this length, it will be dropped, and an
 	  error code sent in its place (-NRF_E2BIG). Cannot be less than 40 bytes.
 	default 200
+
+config SEND_ONLINE_ALERT
+	bool "Sends a routine ALERT_TYPE_DEVICE_NOW_ONLINE on startup"
+	help
+	  Enable this to demonstrate the alert feature of nRF Cloud. Reception of this alert
+	  indicates the device has rebooted.
+
+config POST_PROVISIONING_INTERVAL_M
+	int "Delay in minutes between provisioning checks once connected"
+	default 30
+	help
+	  Use a slower rate to check for provisioning after we have successfully connected.
+	  Until then use CONFIG_NRF_PROVISIONING_INTERVAL_S.
 
 if NRF_CLOUD_COAP
 

@@ -29,8 +29,21 @@ extern "C" {
 /**
  * @brief Initialize the SUIT storage.
  *
- * @retval SUIT_PLAT_SUCCESS           if module is successfully initialized.
- * @retval SUIT_PLAT_ERR_HW_NOT_READY  if NVM controller is unavailable.
+ * @retval SUIT_PLAT_SUCCESS             if module is successfully initialized.
+ * @retval SUIT_PLAT_ERR_AUTHENTICATION  if application MPI digest does not match.
+ * @retval SUIT_PLAT_ERR_NOT_FOUND       if MPIs for essential roles (Nordic, root) are not
+ *                                       configured.
+ * @retval SUIT_PLAT_ERR_OUT_OF_BOUNDS   if one of MPI structures has invalid format.
+ * @retval SUIT_PLAT_ERR_EXISTS          if MPI area contains two regions for the same class IDs.
+ * @retval SUIT_PLAT_ERR_UNSUPPORTED     if one of MPI structures contains unsupported
+ *                                       configuration, (i.e. root class ID cannot be used inside
+ *                                       update candidate).
+ * @retval SUIT_PLAT_ERR_CRASH           if unable to initialize empty NVV erea.
+ * @retval SUIT_PLAT_ERR_HW_NOT_READY    if NVM controller is unavailable.
+ * @retval SUIT_PLAT_ERR_IO              if unable to modify NVM contents.
+ * @retval SUIT_PLAT_ERR_NOMEM           if storage partition is too small.
+ * @retval SUIT_PLAT_ERR_SIZE            if internal buffers are too small.
+ * @retval SUIT_PLAT_ERR_INVAL           in case of internal error.
  */
 suit_plat_err_t suit_storage_init(void);
 
@@ -75,7 +88,7 @@ suit_plat_err_t suit_storage_update_cand_set(suit_plat_mreg_t *regions, size_t l
  * @retval SUIT_PLAT_ERR_CBOR_DECODING  if failed to decode envelope.
  */
 suit_plat_err_t suit_storage_installed_envelope_get(const suit_manifest_class_id_t *id,
-						   const uint8_t **addr, size_t *size);
+						    const uint8_t **addr, size_t *size);
 
 /**
  * @brief Install the authentication block and manifest of the envelope inside the SUIT storage.
@@ -167,6 +180,20 @@ suit_plat_err_t suit_storage_report_save(size_t index, const uint8_t *buf, size_
  * @retval SUIT_PLAT_ERR_NOT_FOUND      if update report is not saved.
  */
 suit_plat_err_t suit_storage_report_read(size_t index, const uint8_t **buf, size_t *len);
+
+/**
+ * @brief Purge all manifests, NVVs as well as MPIs assigned to the domain.
+ *
+ * @note By default, NVVs are locates in the Application manifest domain.
+ *
+ * @param[in]  domain  Manifest domain to purge.
+ *
+ * @retval SUIT_PLAT_SUCCESS            if area was successfully erased.
+ * @retval SUIT_PLAT_ERR_INVAL          if one of the input arguments is invalid (i.e. NULL).
+ * @retval SUIT_PLAT_ERR_HW_NOT_READY   if NVM controller is unavailable.
+ * @retval SUIT_PLAT_ERR_IO             if unable to change NVM contents.
+ */
+suit_plat_err_t suit_storage_purge(suit_manifest_domain_t domain);
 
 #ifdef __cplusplus
 }

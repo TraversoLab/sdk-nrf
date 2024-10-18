@@ -14,10 +14,8 @@ Google Fast Pair Service (GFPS) is a standard for pairing Bluetooth® and Blueto
 Google Fast Pair standard also supports the Find My Device Network (FMDN) extension that is the main focus of this sample demonstration.
 For detailed information, see the official `Fast Pair Find My Device Network extension`_ documentation.
 
-.. note::
-   The software maturity level for the locator tag use case is listed in the :ref:`software_maturity_fast_pair_use_case` table.
-
 This sample follows the `Fast Pair Device Feature Requirements for Locator Tags`_ documentation and uses the Fast Pair configuration for the locator tag use case.
+The software maturity level for the locator tag use case is outlined in the :ref:`software_maturity_fast_pair_use_case` table.
 
 Requirements
 ************
@@ -93,6 +91,82 @@ To bring the accessory back to its initial state and make provisioning available
 After the factory reset operation, the Fast Pair discoverable advertising gets automatically disabled to prevent a restart of the Fast Pair procedure.
 You need to press a button to set your accessory in the Fast Pair discoverable advertising mode and make it available for the next FMDN provisioning.
 
+.. _fast_pair_locator_tag_fp_adv_policy:
+
+Fast Pair advertising policy
+============================
+
+The sample manages Fast Pair advertising, which remains turned on if at least one of the following triggers requests it:
+
+   * UI trigger, which occurs after a button action.
+   * FMDN provisioning trigger, which occurs on the Account Key write operation during the FMDN provisioning operation.
+   * Beacon clock synchronization trigger, which occurs after the system bootup if the device is provisioned.
+   * DFU mode trigger, which occurs upon a DFU mode change.
+
+If the Fast Pair advertising is enabled, the sample will automatically select the correct advertising mode:
+
+   * Fast Pair discoverable advertising - Selected when there is no Account Key stored on the device.
+   * Fast Pair not discoverable advertising - Selected when an Account Key is stored on the device.
+
+To fully disable Fast Pair advertising, all trigger requests must be removed.
+However, not all triggers can be manually disabled by the user, as the FMDN provisioning and Beacon clock synchronization triggers are managed by the sample automatically and are required for it to work correctly.
+This approach ensures that Fast Pair advertising remains enabled as long as any of the modules needs it, preventing premature disabling.
+
+The sample automatically disables the advertising by removing the trigger requests right before the factory reset operation.
+To start Fast Pair discoverable advertising after the FMDN unprovisioning and factory reset operations, you need to activate the UI trigger.
+
+.. note::
+
+   The Bluetooth advertising is active only until the Fast Pair Provider connects to a Bluetooth Central.
+   Once connected, you can still request to turn on the advertising, but it will only activate after you disconnect.
+
+Device Firmware Update (DFU)
+============================
+
+The locator tag sample uses the :ref:`MCUboot <mcuboot:mcuboot_ncs>` bootloader firmware image, enabling application firmware image upgrades through the :ref:`app_dfu` procedure.
+Over-the-air updates are supported using MCUmgr's Simple Management Protocol (SMP) over Bluetooth.
+
+To enable the DFU functionality use the ``SB_CONFIG_APP_DFU`` sysbuild Kconfig option.
+It is enabled by default if the MCUboot bootloader image is used.
+
+To select a specific version of the application, change the :file:`VERSION` file in the sample root directory.
+See the :ref:`zephyr:app-version-details` for details.
+
+.. note::
+   Ensure that the FMDN firmware version defined by the following Kconfig options matches the version in the :file:`VERSION` file:
+
+   * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_DULT_FIRMWARE_VERSION_MAJOR`
+   * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_DULT_FIRMWARE_VERSION_MINOR`
+   * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_DULT_FIRMWARE_VERSION_REVISION`
+
+The bootloader configuration varies depending on the board target:
+
++-----------------------------------------+------------------------------------------------------------+
+| Bootloader configuration                | Board targets                                              |
++=========================================+============================================================+
+| MCUboot, direct-xip mode without revert | * ``nrf52dk/nrf52832`` (only ``release`` configuration)    |
+|                                         | * ``nrf52833dk/nrf52833`` (only ``release`` configuration) |
+|                                         | * ``nrf52840dk/nrf52840``                                  |
+|                                         | * ``nrf54l15dk/nrf54l15/cpuapp``                           |
++-----------------------------------------+------------------------------------------------------------+
+| MCUboot, overwrite only mode            | * ``nrf5340dk/nrf5340/cpuapp``                             |
+|                                         | * ``nrf5340dk/nrf5340/cpuapp/ns``                          |
+|                                         | * ``thingy53/nrf5340/cpuapp``                              |
+|                                         | * ``thingy53/nrf5340/cpuapp/ns``                           |
++-----------------------------------------+------------------------------------------------------------+
+
+DFU mode
+--------
+
+You can perform the DFU procedure by entering the DFU mode for a limited time.
+The DFU mode is accessible regardless of the current FMDN provisioning state.
+
+This mode allows the connected peer to access the SMP GATT Service.
+Access to this service is restricted only to the DFU mode as a security measure.
+This restriction helps satisfy FMDN privacy requirements, which prohibit the locator tag device from sharing identifying information, such as firmware version, with connected peers during standard operation.
+Moreover, after entering the DFU mode, the SMP GATT Service UUID is present in the Fast Pair advertising payload which helps to filter and find the devices that are in the DFU mode.
+It is located in advertising data when Fast Pair advertising is in the discoverable mode, or in the scan response data when it is in the not discoverable mode.
+
 .. _fast_pair_locator_tag_google_device_model:
 
 Fast Pair device registration
@@ -116,7 +190,7 @@ If the Model ID and Anti-Spoofing Private Key are not specified, the following d
    * Device Type: Locator Tag
    * Notification Type: Fast Pair
    * Data-Only connection: true
-   * No Personalized Name: false
+   * No Personalized Name: true
    * Find My Device: true
 
 For details, see :ref:`ug_bt_fast_pair_provisioning` in the Fast Pair user guide.
@@ -134,15 +208,16 @@ User interface
 
 The user interface of the sample depends on the hardware platform you are using.
 
-Development kits
-================
-
 .. tabs::
 
    .. group-tab:: nRF52 and nRF53 DKs
 
       LED 1:
-         Keeps blinking at constant intervals to indicate that firmware is running.
+         Indicates that the firmware is running and informs about the state of the DFU mode.
+         Depending on the DFU mode state:
+
+         * Blinks at a 1 second interval if the DFU mode is disabled.
+         * Blinks at a 0.25 second interval if the DFU mode is enabled.
 
       LED 2:
          Indicates that the ringing action is in progress.
@@ -152,10 +227,12 @@ Development kits
          * Off if the device is not ringing.
 
       LED 3:
-         Depending on the FMDN provisioning state:
+         Depending on the FMDN provisioning state and the Fast Pair advertising state:
 
-         * Lit if the device is provisioned.
-         * Off if the device is not provisioned.
+         * Lit if the device is provisioned and Fast Pair advertising is disabled.
+         * Blinks at a 0.25 second interval if the device is provisioned and Fast Pair advertising is enabled.
+         * Blinks at a 1 second interval if the device is not provisioned and Fast Pair advertising is enabled.
+         * Off if the device is not provisioned and Fast Pair advertising is disabled.
 
       LED 4:
          Depending on the states of the recovery mode and the identification mode:
@@ -166,32 +243,9 @@ Development kits
          * Blinks at a 1 second interval if the recovery mode is active on the device and the identification mode is inactive on the device.
 
       Button 1:
-         Toggles between different modes of the Fast Pair advertising set:
-
-         * Without an Account Key stored on the device:
-
-           * Fast Pair advertising disabled.
-           * Fast Pair discoverable advertising (the default after the system bootup).
-
-         * With an Account Key stored on the device:
-
-           * Fast Pair advertising disabled.
-           * Fast Pair not discoverable advertising (the default after the system bootup).
-
-         .. note::
-
-            The Bluetooth advertising is active only until the Fast Pair Provider connects to a Bluetooth Central.
-            After the connection, you can still switch the advertising modes, but the switch will come into effect only after disconnection.
-
-            The sample automatically switches to the following Fast Pair advertising modes under certain conditions:
-
-            * Fast Pair not discoverable advertising - On the Account Key write operation.
-            * Fast Pair advertising disabled:
-
-               * Right before the factory reset operation.
-                 Press **Button 1** to set the device to the Fast Pair discoverable advertising mode after the unprovisioning operation.
-
-               * After the beacon clock synchronization.
+         Sends a request to turn on Fast Pair advertising or removes such a request.
+         This action controls the UI trigger for Fast Pair advertising.
+         See the :ref:`fast_pair_locator_tag_fp_adv_policy` section for details.
 
       Button 2:
          Stops the ongoing ringing action.
@@ -222,18 +276,31 @@ Development kits
          * Critically low battery level (battery replacement needed soon) - The battery level is higher than or equal to 0% and less than or equal to 10%.
 
       Button 4:
-         A short press requests the FMDN subsystem to enable the identification mode for five minutes.
-         This timeout value is defined by the :kconfig:option:`CONFIG_DULT_ID_READ_STATE_TIMEOUT` Kconfig option according to the DULT specification requirements.
+         When pressed during the application bootup, resets the accessory to its default factory settings.
 
-         A long press (>3 s) enables the recovery mode for one minute as defined by the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_READ_MODE_FMDN_RECOVERY_TIMEOUT` Kconfig option.
+         The triggered action varies depending on how long the button was held:
 
-         When pressed during the application bootup, resets the accessory to default factory settings.
+            * From 0 to 3 seconds:
 
+              Requests the FMDN subsystem to enable the identification mode for five minutes.
+              This timeout value is defined by the :kconfig:option:`CONFIG_DULT_ID_READ_STATE_TIMEOUT` Kconfig option according to the DULT specification requirements.
+
+            * From 3 to 7 seconds:
+
+              Enables the recovery mode for one minute as defined by the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_READ_MODE_FMDN_RECOVERY_TIMEOUT` Kconfig option.
+
+            * From 7 seconds or more:
+
+              Enables the DFU mode for five minutes.
 
    .. group-tab:: nRF54 DKs
 
       LED 0:
-         Keeps blinking at constant intervals to indicate that firmware is running.
+         Indicates that the firmware is running and informs about the state of the DFU mode.
+         Depending on the DFU mode state:
+
+         * Blinks at a 1 second interval if the DFU mode is disabled.
+         * Blinks at a 0.25 second interval if the DFU mode is enabled.
 
       LED 1:
          Indicates that the ringing action is in progress.
@@ -243,10 +310,12 @@ Development kits
          * Off if the device is not ringing.
 
       LED 2:
-         Depending on the FMDN provisioning state:
+         Depending on the FMDN provisioning state and the Fast Pair advertising state:
 
-         * Lit if the device is provisioned.
-         * Off if the device is not provisioned.
+         * Lit if the device is provisioned and Fast Pair advertising is disabled.
+         * Blinks at a 0.25 second interval if the device is provisioned and Fast Pair advertising is enabled.
+         * Blinks at a 1 second interval if the device is not provisioned and Fast Pair advertising is enabled.
+         * Off if the device is not provisioned and Fast Pair advertising is disabled.
 
       LED 3:
          Depending on the states of the recovery mode and the identification mode:
@@ -257,32 +326,9 @@ Development kits
          * Blinks at a 1 second interval if the recovery mode is active on the device and the identification mode is inactive on the device.
 
       Button 0:
-         Toggles between different modes of the Fast Pair advertising set:
-
-         * Without an Account Key stored on the device:
-
-           * Fast Pair advertising disabled.
-           * Fast Pair discoverable advertising (the default after the system bootup).
-
-         * With an Account Key stored on the device:
-
-           * Fast Pair advertising disabled.
-           * Fast Pair not discoverable advertising (the default after the system bootup).
-
-         .. note::
-
-            The Bluetooth advertising is active only until the Fast Pair Provider connects to a Bluetooth Central.
-            After the connection, you can still switch the advertising modes, but the switch will come into effect only after disconnection.
-
-            The sample automatically switches to the following Fast Pair advertising modes under certain conditions:
-
-            * Fast Pair not discoverable advertising - On the Account Key write operation.
-            * Fast Pair advertising disabled:
-
-              * Right before the factory reset operation.
-                Press **Button 0** to set the device to the Fast Pair discoverable advertising mode after the unprovisioning operation.
-
-              * After the beacon clock synchronization.
+         Sends a request to turn on Fast Pair advertising or removes such a request.
+         This action controls the UI trigger for Fast Pair advertising.
+         See the :ref:`fast_pair_locator_tag_fp_adv_policy` section for details.
 
       Button 1:
          Stops the ongoing ringing action.
@@ -313,76 +359,70 @@ Development kits
          * Critically low battery level (battery replacement needed soon) - The battery level is higher than or equal to 0% and less than or equal to 10%.
 
       Button 3:
-         A short press requests the FMDN subsystem to enable the identification mode for five minutes.
-         This timeout value is defined by the :kconfig:option:`CONFIG_DULT_ID_READ_STATE_TIMEOUT` Kconfig option according to the DULT specification requirements.
+         When pressed during the application bootup, resets the accessory to its default factory settings.
 
-         A long press (>3 s) enables the recovery mode for one minute as defined by the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_READ_MODE_FMDN_RECOVERY_TIMEOUT` Kconfig option.
+         The triggered action varies depending on how long the button was held:
 
-         When pressed during the application bootup, resets the accessory to default factory settings.
+            * From 0 to 3 seconds:
 
-Thingy:53
-=========
+              Requests the FMDN subsystem to enable the identification mode for five minutes.
+              This timeout value is defined by the :kconfig:option:`CONFIG_DULT_ID_READ_STATE_TIMEOUT` Kconfig option according to the DULT specification requirements.
 
-RGB LED:
-   Thingy:53 displays the application state in the RGB scale using **LED1**.
-   The **LED1** displays a color sequence with each blink that indicates the overall application state.
+            * From 3 to 7 seconds:
 
-   Each color of the LED indicates the different application state:
+              Enables the recovery mode for one minute as defined by the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_READ_MODE_FMDN_RECOVERY_TIMEOUT` Kconfig option.
 
-   * Green - Indicates that firmware is running.
-   * Blue - Indicates that the device is provisioned.
-   * Yellow - Indicates that the identification mode is active.
-   * Red - Indicates that the recovery mode is active.
-   * White - Indicates that the Fast Pair advertising is active.
+            * From 7 seconds or more:
 
-Speaker/Buzzer:
-   Produces sound when the ringing action is in progress and to indicate a new button action.
+              Enables the DFU mode for five minutes.
 
-Button (SW3):
-   When pressed during the application bootup, the accessory is reset to its default factory settings.
+   .. group-tab:: Thingy:53
 
-   When pressed, stops the ongoing ringing action.
+      RGB LED:
+         Thingy:53 displays the application state in the RGB scale using **LED1**.
+         The **LED1** displays a color sequence with each blink that indicates the overall application state.
 
-   When released, the action depends on how long the button was held:
+         Each color of the LED indicates the different application state:
 
-   * From 1 to 3 seconds (notified by one short beep):
+         * Green - Indicates that firmware is running.
+         * Blue - Indicates that the device is provisioned.
+         * Yellow - Indicates that the identification mode is active.
+         * Red - Indicates that the recovery mode is active.
+         * White - Indicates that the Fast Pair advertising is active.
+         * Purple - Indicates that the DFU mode is active.
 
-     Toggles between different modes of the Fast Pair advertising set:
+      Speaker/Buzzer:
+         Produces sound when the ringing action is in progress and to indicate a new button action.
 
-     * Without an Account Key stored on the device:
+      Button (SW3):
+         When pressed during the application bootup, resets the accessory to its default factory settings.
 
-       * Fast Pair advertising disabled.
-       * Fast Pair discoverable advertising (the default after the system bootup).
+         When pressed, stops the ongoing ringing action.
 
-     * With an Account Key stored on the device:
+         When released, the triggered action varies depending on how long the button was held:
 
-       * Fast Pair advertising disabled.
-       * Fast Pair not discoverable advertising (the default after the system bootup).
+         * From 1 to 3 seconds (notified by one short beep):
 
-     .. note::
-        The Bluetooth advertising is active only until the Fast Pair Provider connects to a Bluetooth Central.
-        After the connection, you can still switch the advertising modes, but the effect is only after disconnection.
+           Sends a request to turn on Fast Pair advertising or removes such a request.
+           This action controls the UI trigger for Fast Pair advertising.
+           See the :ref:`fast_pair_locator_tag_fp_adv_policy` section for details.
 
-        The sample automatically switches to the following Fast Pair advertising modes under certain conditions:
+         * From 3 to 5 seconds (notified by two short beeps):
 
-        * Fast Pair not discoverable advertising - On the Account Key write operation.
-        * Fast Pair advertising disabled:
+           Requests the FMDN subsystem to enable the identification mode for five minutes.
+           This timeout value is defined by the :kconfig:option:`CONFIG_DULT_ID_READ_STATE_TIMEOUT` Kconfig option according to the DULT specification requirements.
 
-          * Right before the factory reset operation.
-          * After the beacon clock synchronization.
+         * From 5 to 7 seconds (notified by three short beeps):
 
-   * From 3 to 5 seconds (notified by two short beeps):
+           Enables the recovery mode for one minute as defined by the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_READ_MODE_FMDN_RECOVERY_TIMEOUT` Kconfig option.
 
-     Requests the FMDN subsystem to enable the identification mode for five minutes.
-     This timeout value is defined by the :kconfig:option:`CONFIG_DULT_ID_READ_STATE_TIMEOUT` Kconfig option according to the DULT specification requirements.
+         * From 7 to 10 seconds (notified by four short beeps):
 
-   * From 5 to 7 seconds (notified by three short beeps):
+           Enables the DFU mode for five minutes.
 
-     Enables the recovery mode for one minute as defined by the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_READ_MODE_FMDN_RECOVERY_TIMEOUT` Kconfig option.
+         * From 10 seconds or more (notified by one longer beep):
 
-   * From 7 seconds or more (notified by one longer beep):
-
-     No action - allows to not perform any button operation.
+           No action - allows to not perform any button operation.
 
 Configuration
 *************
@@ -392,36 +432,49 @@ Configuration
 Configuration options
 =====================
 
-All Kconfig options are specific to the chosen platform type and are listed in their dedicated subsections.
+The following Kconfig options are specific to the Fast Pair locator tag sample.
 
-Development kits
-----------------
+.. _SB_CONFIG_APP_DFU:
 
-Check and configure the following Kconfig options for your development kit board target:
+SB_CONFIG_APP_DFU
+   The sample sysbuild configuration option enables the Device Firmware Update (DFU) functionality.
+   The value of this option is propagated to the application configuration option :ref:`CONFIG_APP_DFU <CONFIG_APP_DFU>`.
+   On multi-core devices, it adds the Kconfig fragment to the network core image configuration which speeds up the DFU process.
+   By default, this option is enabled if the MCUboot bootloader image is used.
 
-.. _CONFIG_APP_BATTERY_LEVEL_DECREMENT:
+.. _CONFIG_APP_DFU:
 
-CONFIG_APP_BATTERY_LEVEL_DECREMENT
-   The sample configuration defines the decrement value used to simulate the battery level on the development kit.
-   The battery level is defined in percentages and ranges from 0% to 100%.
-   By default, the decrement level is set to 10%.
+CONFIG_APP_DFU
+   The sample application configuration option enables the Device Firmware Update (DFU) functionality.
+   The value of this option is set based on the sysbuild configuration option :ref:`SB_CONFIG_APP_DFU <SB_CONFIG_APP_DFU>`.
 
-Thingy:53
----------
+The following Kconfig options are specific to the chosen hardware platform.
 
-Check and configure the following Kconfig options for your Thingy:53 board target:
+.. tabs::
 
-.. _CONFIG_APP_BATTERY_POLL_INTERVAL:
+   .. group-tab:: Development kits
 
-CONFIG_APP_BATTERY_POLL_INTERVAL
-   The sample configuration defines the polling interval in seconds for measuring battery level.
-   By default, the interval is set to 60 seconds.
+      .. _CONFIG_APP_BATTERY_LEVEL_DECREMENT:
 
-.. _CONFIG_APP_UI_SPEAKER_FREQ:
+      CONFIG_APP_BATTERY_LEVEL_DECREMENT
+         The sample configuration defines the decrement value used to simulate the battery level on the development kit.
+         The battery level is defined in percentages and ranges from 0% to 100%.
+         By default, the decrement level is set to 10%.
 
-CONFIG_APP_UI_SPEAKER_FREQ
-   The sample configuration defines the frequency in hertz units for sounds generated by the speaker.
-   By default, the frequency is set to 4000 Hz.
+
+   .. group-tab:: Thingy:53
+
+      .. _CONFIG_APP_BATTERY_POLL_INTERVAL:
+
+      CONFIG_APP_BATTERY_POLL_INTERVAL
+         The sample configuration defines the polling interval in seconds for measuring battery level.
+         By default, the interval is set to 60 seconds.
+
+      .. _CONFIG_APP_UI_SPEAKER_FREQ:
+
+      CONFIG_APP_UI_SPEAKER_FREQ
+         The sample configuration defines the frequency in hertz units for sounds generated by the speaker.
+         By default, the frequency is set to 4000 Hz.
 
 Building and running
 ********************
@@ -485,8 +538,8 @@ Testing
       1. |connect_terminal_specific|
       #. Reset the development kit.
       #. Observe that **LED 1** is blinking to indicate that firmware is running.
-      #. Observe that **LED 3** is off, which indicates that the device is not provisioned as an FMDN beacon.
-         The Fast Pair Provider is advertising in the Fast Pair discoverable mode and is ready for the FMDN provisioning.
+      #. Observe that **LED 3** is blinking in 1 second intervals, which indicates that the device is not provisioned as an FMDN beacon and the Fast Pair discoverable advertising is enabled.
+         The Fast Pair Provider is ready for the FMDN provisioning.
       #. Move the Android device close to your locator tag device.
       #. Wait for the notification from your Android device about the detected Fast Pair Provider.
 
@@ -508,7 +561,7 @@ Testing
             :scale: 80 %
             :alt: Notification about provisioning completion for the `Find My Device app`_
 
-      #. Observe that **LED 3** is lit, which indicates that the device is provisioned as an FMDN beacon.
+      #. Observe that **LED 3** is lit, which indicates that the device is provisioned as an FMDN beacon and the Fast Pair advertising is disabled.
       #. Open the `Find My Device app`_ by tapping the :guilabel:`Open app` button.
       #. In your accessory view, tap the :guilabel:`Find nearby` button.
       #. Observe in the Find nearby view that the grey shape shrinks when you move your Android device further away from your locator tag device.
@@ -540,17 +593,17 @@ Testing
 
       #. Reconfirm the procedure by tapping the :guilabel:`Remove` button in the Android pop-up window.
       #. Wait for the unprovisioning operation to complete.
-      #. Observe that **LED 3** is off, which indicates that the device is no longer provisioned as an FMDN beacon.
+      #. Observe that **LED 3** is off, which indicates that the device is no longer provisioned as an FMDN beacon and the Fast Pair advertising is disabled.
       #. Observe that the Android does not display a notification about the detected Fast Pair Provider, as the locator tag device disables advertising after the unprovisioning operation.
-      #. Press **Button 1** if you want to start the Fast Pair discoverable advertising and restart the FMDN provisioning process.
+      #. Press **Button 1** to request turning on the Fast Pair advertising in discoverable mode and to restart the FMDN provisioning process.
 
    .. group-tab:: nRF54 DKs
 
       1. |connect_terminal_specific|
       #. Reset the development kit.
       #. Observe that **LED 0** is blinking to indicate that firmware is running.
-      #. Observe that **LED 2** is off, which indicates that the device is not provisioned as an FMDN beacon.
-         The Fast Pair Provider is advertising in the Fast Pair discoverable mode and is ready for the FMDN provisioning.
+      #. Observe that **LED 2** is blinking in 1 second intervals, which indicates that the device is not provisioned as an FMDN beacon and the Fast Pair discoverable advertising is enabled.
+         The Fast Pair Provider is ready for the FMDN provisioning.
       #. Move the Android device close to your locator tag device.
       #. Wait for the notification from your Android device about the detected Fast Pair Provider.
 
@@ -572,7 +625,7 @@ Testing
             :scale: 80 %
             :alt: Notification about provisioning completion for the `Find My Device app`_
 
-      #. Observe that **LED 2** is lit, which indicates that the device is provisioned as an FMDN beacon.
+      #. Observe that **LED 2** is lit, which indicates that the device is provisioned as an FMDN beacon and the Fast Pair advertising is disabled.
       #. Open the `Find My Device app`_ by tapping the :guilabel:`Open app` button.
       #. In your accessory view, tap the :guilabel:`Find nearby` button.
       #. Observe in the Find nearby view that the grey shape shrinks when you move your Android device further away from your locator tag device.
@@ -604,9 +657,9 @@ Testing
 
       #. Reconfirm the procedure by tapping the :guilabel:`Remove` button in the Android pop-up window.
       #. Wait for the unprovisioning operation to complete.
-      #. Observe that **LED 2** is off, which indicates that the device is no longer provisioned as an FMDN beacon.
+      #. Observe that **LED 2** is off, which indicates that the device is no longer provisioned as an FMDN beacon and the Fast Pair advertising is disabled.
       #. Observe that the Android does not display a notification about the detected Fast Pair Provider, as the locator tag device disables advertising after the unprovisioning operation.
-      #. Press **Button 0** if you want to start the Fast Pair discoverable advertising and restart the FMDN provisioning process.
+      #. Press **Button 0** to request turning on the Fast Pair advertising in discoverable mode and to restart the FMDN provisioning process.
 
 
 Clock synchronization
@@ -690,6 +743,51 @@ To test this feature, complete the following steps:
          Navigate to your accessory view, and tap the :guilabel:`Find nearby` button.
       #. Start the ringing action on your device by tapping the :guilabel:`Play sound` button.
       #. Observe that **LED 1** is lit to confirm that the Android device is able to connect to your development kit after a clock synchronization.
+
+Performing the DFU procedure
+----------------------------
+
+To perform the DFU procedure, complete the following steps:
+
+.. tabs::
+
+   .. group-tab:: nRF52 and nRF53 DKs
+
+      1. Observe that **LED 1** is blinking at a 1 second interval, which indicates that the DFU mode is disabled.
+      #. Press the **Button 4** for 7 seconds or more to enter the DFU mode.
+      #. Observe that **LED 1** is blinking at a 0.25 second interval, which indicates that the DFU mode is enabled.
+      #. Observe that **LED 3** is blinking, which indicates that the Fast Pair advertising is enabled.
+      #. Perform DFU using the `nRF Connect Device Manager`_ mobile app:
+
+         .. include:: /app_dev/device_guides/nrf52/fota_update.rst
+            :start-after: fota_upgrades_over_ble_nrfcdm_common_dfu_steps_start
+            :end-before: fota_upgrades_over_ble_nrfcdm_common_dfu_steps_end
+
+   .. group-tab:: nRF54 DKs
+
+      1. Observe that **LED 0** is blinking at a 1 second interval, which indicates that the DFU mode is disabled.
+      #. Press the **Button 3** for 7 seconds or more to enter the DFU mode.
+      #. Observe that **LED 0** is blinking at a 0.25 second interval, which indicates that the DFU mode is enabled.
+      #. Observe that **LED 2** is blinking, which indicates that the Fast Pair advertising is enabled.
+      #. Perform DFU using the `nRF Connect Device Manager`_ mobile app:
+
+         .. include:: /app_dev/device_guides/nrf52/fota_update.rst
+            :start-after: fota_upgrades_over_ble_nrfcdm_common_dfu_steps_start
+            :end-before: fota_upgrades_over_ble_nrfcdm_common_dfu_steps_end
+
+Disabling the locator tag
+-------------------------
+
+The following instructions on disabling the locator tag apply to the default debug device model registered for this sample (see the :ref:`fast_pair_locator_tag_google_device_model` section), and are used for demonstration purposes.
+
+To disable the locator tag device, complete the following steps:
+
+1. Find the power switch on the device.
+#. Turn off the locator tag by sliding the switch to the off position.
+#. Observe that the on-device LEDs are turned off.
+
+.. note::
+   Vendor-specific instructions on disabling the unknown trackers are registered on mobile platforms, like Android and iOS, for each device model.
 
 Fast Pair Validator app
 -----------------------
@@ -798,7 +896,9 @@ Fast Pair GATT Service
 This sample uses the :ref:`bt_fast_pair_readme` and its dependencies and is configured to meet the requirements of the Fast Pair standard together with its FMDN extension.
 For details about integrating Fast Pair in the |NCS|, see :ref:`ug_bt_fast_pair`.
 
-The :ref:`bt_fast_pair_provision_script` is used by the build system to automatically generate the hexadecimal file that contains the Fast Pair Model ID and Anti Spoofing Private Key.
+This sample enables the ``SB_CONFIG_BT_FAST_PAIR`` Kconfig option.
+With this option enabled, the build system calls the :ref:`bt_fast_pair_provision_script`, which automatically generates a hexadecimal file containing Fast Pair Model ID and Anti Spoofing Private Key.
+For more details about enabling Fast Pair for your application, see the :ref:`ug_bt_fast_pair_prerequisite_ops_kconfig` section in the Fast Pair integration guide.
 
 Bluetooth LE advertising data providers
 =======================================
@@ -811,3 +911,15 @@ The sample uses the following providers to generate the advertising packet paylo
 * Google Fast Pair provider (:kconfig:option:`CONFIG_BT_ADV_PROV_FAST_PAIR`)
 
 The sample uses the Bluetooth device name provider (:kconfig:option:`CONFIG_BT_ADV_PROV_DEVICE_NAME`) provider to generate the scan response data.
+
+When the DFU functionality is enabled (:ref:`CONFIG_APP_DFU <CONFIG_APP_DFU>`), the sample uses the SMP GATT Service UUID provider.
+The SMP UUID is placed in the advertising data when Fast Pair advertising is in the discoverable mode, or in the scan response data when it is in the not discoverable mode.
+
+Device Firmware Update (DFU)
+============================
+
+This sample uses following components for the DFU functionality:
+
+* :ref:`MCUboot bootloader <mcuboot:mcuboot_ncs>`
+* :ref:`zephyr:app-version-details`
+* :ref:`zephyr:mcu_mgr`

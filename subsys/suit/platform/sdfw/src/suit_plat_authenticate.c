@@ -10,9 +10,6 @@
 #include <suit_plat_decode_util.h>
 #include <suit_plat_component_compatibility.h>
 #include <zephyr/logging/log.h>
-#ifdef CONFIG_SDFW_BUILTIN_KEYS
-#include <sdfw/sdfw_builtin_keys.h>
-#endif /* CONFIG_SDFW_BUILTIN_KEYS */
 
 LOG_MODULE_REGISTER(suit_plat_authenticate, CONFIG_SUIT_LOG_LEVEL);
 
@@ -21,7 +18,7 @@ int suit_plat_authenticate_manifest(struct zcbor_string *manifest_component_id,
 				    struct zcbor_string *signature, struct zcbor_string *data)
 {
 	psa_algorithm_t psa_alg;
-	psa_key_id_t public_key_id = 0;
+	uint32_t public_key_id = 0;
 	suit_manifest_class_id_t *class_id = NULL;
 
 	switch (alg_id) {
@@ -78,21 +75,25 @@ int suit_plat_authenticate_manifest(struct zcbor_string *manifest_component_id,
 		return SUIT_ERR_AUTHENTICATION;
 	}
 
-	/* Verify data */
-#ifdef CONFIG_SDFW_BUILTIN_KEYS
-	if (sdfw_builtin_keys_is_builtin(public_key_id)) {
-		if (sdfw_builtin_keys_verify_message(public_key_id, psa_alg, data->value, data->len,
-						     signature->value,
-						     signature->len) == PSA_SUCCESS) {
-			return SUIT_SUCCESS;
-		}
-
-		LOG_ERR("Signature verification failed.");
+#ifdef CONFIG_ZTEST
+	ret = suit_mci_signing_key_id_get(class_id, &public_key_id);
+	if (ret != SUIT_PLAT_SUCCESS) {
+		LOG_ERR("Unable to find volatile key ID: MCI err %i", ret);
 		return SUIT_ERR_AUTHENTICATION;
 	}
-#endif /* CONFIG_SDFW_BUILTIN_KEYS */
+#endif /* CONFIG_ZTEST */
 
-	if (psa_verify_message(public_key_id, psa_alg, data->value, data->len, signature->value,
+#ifdef MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER
+	mbedtls_svc_key_id_t key;
+
+	key.MBEDTLS_PRIVATE(key_id) = public_key_id;
+	key.MBEDTLS_PRIVATE(owner) = NRF_OWNER_SECURE;
+#else  /* MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER */
+	psa_key_id_t key = public_key_id;
+#endif /* MBEDTLS_PSA_CRYPTO_KEY_ID_ENCODES_OWNER */
+
+	/* Verify data */
+	if (psa_verify_message(key, psa_alg, data->value, data->len, signature->value,
 			       signature->len) == PSA_SUCCESS) {
 		return SUIT_SUCCESS;
 	}

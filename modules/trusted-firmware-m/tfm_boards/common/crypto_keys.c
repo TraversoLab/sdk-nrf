@@ -19,11 +19,12 @@
 
 #include <identity_key.h>
 
-#define TFM_NS_PARTITION_ID -1
+#define MAPPED_TZ_NS_AGENT_DEFAULT_CLIENT_ID -0x3c000000
+#define TFM_NS_PARTITION_ID                  MAPPED_TZ_NS_AGENT_DEFAULT_CLIENT_ID
 
 #ifdef CONFIG_HW_UNIQUE_KEY
 static enum tfm_plat_err_t tfm_plat_get_huk(uint8_t *buf, size_t buf_len, size_t *key_len,
-					    size_t *key_bits, psa_algorithm_t *algorithm,
+					    psa_key_bits_t *key_bits, psa_algorithm_t *algorithm,
 					    psa_key_type_t *type)
 {
 	if (buf_len < HUK_SIZE_BYTES) {
@@ -52,7 +53,7 @@ static enum tfm_plat_err_t tfm_plat_get_huk(uint8_t *buf, size_t buf_len, size_t
 
 #ifdef TFM_PARTITION_INITIAL_ATTESTATION
 static enum tfm_plat_err_t tfm_plat_get_iak(uint8_t *buf, size_t buf_len, size_t *key_len,
-					    size_t *key_bits, psa_algorithm_t *algorithm,
+					    psa_key_bits_t *key_bits, psa_algorithm_t *algorithm,
 					    psa_key_type_t *type)
 {
 	int err;

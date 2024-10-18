@@ -59,16 +59,16 @@ extern const uint8_t manifest_root_validate_load_invoke_buf[];
 extern const size_t manifest_root_validate_load_invoke_len;
 
 /* Valid root envelope */
-extern const uint8_t manifest_valid_buf[];
-extern const size_t manifest_valid_len;
+extern uint8_t manifest_valid_buf[];
+extern size_t manifest_valid_len;
 
 /* Valid application envelope */
-extern const uint8_t manifest_valid_app_buf[];
-extern const size_t manifest_valid_app_len;
+extern uint8_t manifest_valid_app_buf[];
+extern size_t manifest_valid_app_len;
 
 /* Originally valid envelope with manipulated single byte */
-extern const uint8_t manifest_manipulated_buf[];
-extern const size_t manifest_manipulated_len;
+extern uint8_t manifest_manipulated_buf[];
+extern size_t manifest_manipulated_len;
 
 /* Random bytes, attached to the envelopes as FW. */
 extern const uint8_t sample_fw_buf[];
@@ -135,7 +135,7 @@ static void setup_install_envelope(const suit_manifest_class_id_t *class_id, con
 
 ZTEST_SUITE(orchestrator_boot_tests, NULL, setup_install_fw, NULL, NULL, NULL);
 
-ZTEST(orchestrator_boot_tests, test_invalid_exec_mode)
+ZTEST(orchestrator_boot_tests, test_boot_invalid_exec_mode)
 {
 	const uint8_t *buf;
 	size_t len;

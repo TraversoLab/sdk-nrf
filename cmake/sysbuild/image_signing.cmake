@@ -52,8 +52,10 @@ function(zephyr_mcuboot_tasks)
   # MCUboot.
   #
   # Therefore, go with an explicitly installed imgtool first, falling
-  # back on mcuboot/scripts/imgtool.py.
-  if(IMGTOOL)
+  # back on mcuboot/scripts/imgtool.py. We exclude the system imgtool when
+  # compressed image support is enabled due to needing a version of imgtool
+  # that has features not in the most recent public release.
+  if(IMGTOOL AND NOT CONFIG_MCUBOOT_COMPRESSED_IMAGE_SUPPORT_ENABLED)
     set(imgtool_path "${IMGTOOL}")
   elseif(DEFINED ZEPHYR_MCUBOOT_MODULE_DIR)
     set(IMGTOOL_PY "${ZEPHYR_MCUBOOT_MODULE_DIR}/scripts/imgtool.py")
@@ -68,6 +70,8 @@ function(zephyr_mcuboot_tasks)
     return()
   endif()
 
+  set(imgtool_directxip_hex_command)
+
   if(CONFIG_MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT OR CONFIG_MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP)
     # XIP image, need to use the fixed address for this slot
     if(CONFIG_NCS_IS_VARIANT_IMAGE)
@@ -75,8 +79,19 @@ function(zephyr_mcuboot_tasks)
     else()
       set(imgtool_rom_command --rom-fixed @PM_MCUBOOT_PRIMARY_ADDRESS@)
     endif()
+
+    if(CONFIG_MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT)
+      set(imgtool_directxip_hex_command --confirm)
+    endif()
   endif()
-  set(imgtool_sign ${PYTHON_EXECUTABLE} ${imgtool_path} sign --version ${CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION} --align 4 --slot-size @PM_MCUBOOT_PRIMARY_SIZE@ --pad-header --header-size @PM_MCUBOOT_PAD_SIZE@ ${imgtool_rom_command} CACHE STRING "imgtool sign command")
+
+  # Split fields, imgtool_sign_sysbuild is stored in cache which will have fields updated by
+  # sysbuild, imgtool_sign must not be stored in cache because it would then prevent those fields
+  # from being updated without a pristine build
+  # TODO: NCSDK-28461 sysbuild PM fields cannot be updated without a pristine build, will become
+  # invalid if a static PM file is updated without pristine build
+  set(imgtool_sign_sysbuild --slot-size @PM_MCUBOOT_PRIMARY_SIZE@ --pad-header --header-size @PM_MCUBOOT_PAD_SIZE@ ${imgtool_rom_command} CACHE STRING "imgtool sign sysbuild replacement")
+  set(imgtool_sign ${PYTHON_EXECUTABLE} ${imgtool_path} sign --version ${CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION} --align 4 ${imgtool_sign_sysbuild})
 
   # Arguments to imgtool.
   if(NOT CONFIG_MCUBOOT_EXTRA_IMGTOOL_ARGS STREQUAL "")
@@ -88,6 +103,19 @@ function(zephyr_mcuboot_tasks)
     separate_arguments(imgtool_extra UNIX_COMMAND ${CONFIG_MCUBOOT_EXTRA_IMGTOOL_ARGS})
   else()
     set(imgtool_extra)
+  endif()
+
+  if(CONFIG_MCUBOOT_COMPRESSED_IMAGE_SUPPORT_ENABLED)
+    set(imgtool_bin_extra --compression lzma2armthumb)
+  else()
+    set(imgtool_bin_extra)
+  endif()
+
+  # Apply compression to hex file if this is a test
+  if(ncs_compress_test_compress_hex)
+    set(imgtool_hex_extra ${imgtool_bin_extra})
+  else()
+    set(imgtool_hex_extra)
   endif()
 
   if(CONFIG_MCUBOOT_HARDWARE_DOWNGRADE_PREVENTION)
@@ -128,7 +156,7 @@ function(zephyr_mcuboot_tasks)
 
     list(APPEND byproducts ${output}.bin)
     zephyr_runner_file(bin ${output}.bin)
-    set(BYPRODUCT_KERNEL_SIGNED_BIN_NAME "${output}.signed.bin"
+    set(BYPRODUCT_KERNEL_SIGNED_BIN_NAME "${output}.bin"
         CACHE FILEPATH "Signed kernel bin file" FORCE
     )
 
@@ -140,7 +168,7 @@ function(zephyr_mcuboot_tasks)
     # calls to the "extra_post_build_commands" property ensures they run
     # after the commands which generate the unsigned versions.
     set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-      ${imgtool_sign} ${imgtool_args} ${unconfirmed_args})
+      ${imgtool_sign} ${imgtool_args} ${imgtool_bin_extra} ${unconfirmed_args})
 
     if(NOT "${keyfile_enc}" STREQUAL "")
       if(CONFIG_BUILD_WITH_TFM)
@@ -151,12 +179,12 @@ function(zephyr_mcuboot_tasks)
       endif()
 
       list(APPEND byproducts ${output}.encrypted.bin)
-      set(BYPRODUCT_KERNEL_SIGNED_ENCRYPTED_BIN_NAME "${output}.signed.encrypted.bin"
+      set(BYPRODUCT_KERNEL_SIGNED_ENCRYPTED_BIN_NAME "${output}.encrypted.bin"
           CACHE FILEPATH "Signed and encrypted kernel bin file" FORCE
       )
 
       set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-        ${imgtool_sign} ${imgtool_args} --encrypt "${keyfile_enc}" ${unconfirmed_args})
+        ${imgtool_sign} ${imgtool_args} --encrypt "${keyfile_enc}" ${imgtool_bin_extra} ${unconfirmed_args})
     endif()
   endif()
 
@@ -183,17 +211,17 @@ function(zephyr_mcuboot_tasks)
     # calls to the "extra_post_build_commands" property ensures they run
     # after the commands which generate the unsigned versions.
     set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-      ${imgtool_sign} ${imgtool_args} ${unconfirmed_args})
+      ${imgtool_sign} ${imgtool_args} ${imgtool_directxip_hex_command} ${imgtool_hex_extra} ${unconfirmed_args})
 
     if(NOT "${keyfile_enc}" STREQUAL "")
       set(unconfirmed_args ${input}.hex ${output}.encrypted.hex)
       list(APPEND byproducts ${output}.encrypted.hex)
-      set(BYPRODUCT_KERNEL_SIGNED_ENCRYPTED_HEX_NAME "${output}.signed.encrypted.hex"
+      set(BYPRODUCT_KERNEL_SIGNED_ENCRYPTED_HEX_NAME "${output}.encrypted.hex"
           CACHE FILEPATH "Signed and encrypted kernel hex file" FORCE
       )
 
       set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-        ${imgtool_sign} ${imgtool_args} --encrypt "${keyfile_enc}" ${unconfirmed_args})
+        ${imgtool_sign} ${imgtool_args} --encrypt "${keyfile_enc}" ${imgtool_hex_extra} ${unconfirmed_args})
     endif()
   endif()
 

@@ -15,10 +15,9 @@
 #include <nrf_modem_at.h>
 #include <modem/lte_lc.h>
 #include <modem/lte_lc_trace.h>
-#include <modem/at_cmd_parser.h>
-#include <modem/at_params.h>
 #include <modem/at_monitor.h>
 #include <modem/nrf_modem_lib.h>
+#include <modem/at_parser.h>
 #include <zephyr/logging/log.h>
 
 #include "lte_lc_helpers.h"
@@ -136,10 +135,7 @@ K_WORK_DEFINE(lte_lc_psm_get_work, lte_lc_psm_get_work_fn);
 static void lte_lc_edrx_ptw_send_work_fn(struct k_work *work_item);
 K_WORK_DEFINE(lte_lc_edrx_ptw_send_work, lte_lc_edrx_ptw_send_work_fn);
 
-static void lte_lc_edrx_req_work_fn(struct k_work *work_item);
-K_WORK_DEFINE(lte_lc_edrx_req_work, lte_lc_edrx_req_work_fn);
-
-K_THREAD_STACK_DEFINE(lte_lc_work_q_stack, 1024);
+K_THREAD_STACK_DEFINE(lte_lc_work_q_stack, CONFIG_LTE_LC_WORKQUEUE_STACK_SIZE);
 
 static struct k_work_q lte_lc_work_q;
 
@@ -246,6 +242,7 @@ AT_MONITOR(ltelc_atmon_xt3412, "%XT3412", at_handler_xt3412);
 AT_MONITOR(ltelc_atmon_ncellmeas, "%NCELLMEAS", at_handler_ncellmeas);
 AT_MONITOR(ltelc_atmon_xmodemsleep, "%XMODEMSLEEP", at_handler_xmodemsleep);
 AT_MONITOR(ltelc_atmon_mdmev, "%MDMEV", at_handler_mdmev);
+AT_MONITOR(ltelc_atmon_rai, "%RAI", at_handler_rai);
 
 static void at_handler_cereg(const char *response)
 {
@@ -256,17 +253,14 @@ static void at_handler_cereg(const char *response)
 
 	static enum lte_lc_nw_reg_status prev_reg_status = LTE_LC_NW_REG_NOT_REGISTERED;
 	static struct lte_lc_cell prev_cell;
-	enum lte_lc_nw_reg_status reg_status = 0;
-	struct lte_lc_cell cell = {0};
+	enum lte_lc_nw_reg_status reg_status;
+	struct lte_lc_cell cell;
 	enum lte_lc_lte_mode lte_mode;
-	struct lte_lc_psm_cfg psm_cfg = {
-		.active_time = -1,
-		.tau = -1
-	};
+	struct lte_lc_psm_cfg psm_cfg;
 
 	LOG_DBG("+CEREG notification: %.*s", strlen(response) - strlen("\r\n"), response);
 
-	err = parse_cereg(response, true, &reg_status, &cell, &lte_mode, &psm_cfg);
+	err = parse_cereg(response, &reg_status, &cell, &lte_mode, &psm_cfg);
 	if (err) {
 		LOG_ERR("Failed to parse notification (error %d): %s",
 			err, response);
@@ -308,6 +302,9 @@ static void at_handler_cereg(const char *response)
 	case LTE_LC_NW_REG_UICC_FAIL:
 		LTE_LC_TRACE(LTE_LC_TRACE_NW_REG_UICC_FAIL);
 		break;
+	default:
+		LOG_ERR("Unknown network registration status: %d", reg_status);
+		return;
 	}
 
 	if (event_handler_list_is_empty()) {
@@ -333,10 +330,6 @@ static void at_handler_cereg(const char *response)
 	}
 
 	if (lte_mode != prev_lte_mode) {
-		prev_lte_mode = lte_mode;
-		evt.type = LTE_LC_EVT_LTE_MODE_UPDATE;
-		evt.lte_mode = lte_mode;
-
 		switch (lte_mode) {
 		case LTE_LC_LTE_MODE_LTEM:
 			LTE_LC_TRACE(LTE_LC_TRACE_LTE_MODE_UPDATE_LTEM);
@@ -347,7 +340,14 @@ static void at_handler_cereg(const char *response)
 		case LTE_LC_LTE_MODE_NONE:
 			LTE_LC_TRACE(LTE_LC_TRACE_LTE_MODE_UPDATE_NONE);
 			break;
+		default:
+			LOG_ERR("Unknown LTE mode: %d", lte_mode);
+			return;
 		}
+
+		prev_lte_mode = lte_mode;
+		evt.type = LTE_LC_EVT_LTE_MODE_UPDATE;
+		evt.lte_mode = lte_mode;
 
 		event_handler_list_dispatch(&evt);
 	}
@@ -460,20 +460,17 @@ static void at_handler_ncellmeas_gci(const char *response)
 	int err;
 	struct lte_lc_evt evt = {0};
 	const char *resp = response;
+	struct lte_lc_cell *cells = NULL;
 
 	__ASSERT_NO_MSG(response != NULL);
-
-	int max_cell_count = ncellmeas_params.gci_count;
-	struct lte_lc_cell *cells = NULL;
+	__ASSERT_NO_MSG(ncellmeas_params.gci_count != 0);
 
 	LOG_DBG("%%NCELLMEAS GCI notification parsing starts");
 
-	if (max_cell_count != 0) {
-		cells = k_calloc(max_cell_count, sizeof(struct lte_lc_cell));
-		if (cells == NULL) {
-			LOG_ERR("Failed to allocate memory for the GCI cells");
-			return;
-		}
+	cells = k_calloc(ncellmeas_params.gci_count, sizeof(struct lte_lc_cell));
+	if (cells == NULL) {
+		LOG_ERR("Failed to allocate memory for the GCI cells");
+		return;
 	}
 
 	evt.cells_info.gci_cells = cells;
@@ -623,6 +620,26 @@ static void at_handler_mdmev(const char *response)
 	event_handler_list_dispatch(&evt);
 }
 
+static void at_handler_rai(const char *response)
+{
+	int err;
+	struct lte_lc_evt evt = {0};
+
+	__ASSERT_NO_MSG(response != NULL);
+
+	LOG_DBG("%%RAI notification");
+
+	err = parse_rai(response, &evt.rai_cfg);
+	if (err) {
+		LOG_ERR("Can't parse RAI notification, error: %d", err);
+		return;
+	}
+
+	evt.type = LTE_LC_EVT_RAI_UPDATE;
+
+	event_handler_list_dispatch(&evt);
+}
+
 static int enable_notifications(void)
 {
 	int err;
@@ -665,57 +682,17 @@ static int enable_notifications(void)
 	return 0;
 }
 
-static int fallback_system_mode_set(void)
-{
-	int err;
-	enum lte_lc_system_mode fallback_sys_mode;
-
-	switch (lte_lc_sys_mode) {
-	case LTE_LC_SYSTEM_MODE_LTEM:
-		fallback_sys_mode = LTE_LC_SYSTEM_MODE_NBIOT;
-		break;
-
-	case LTE_LC_SYSTEM_MODE_NBIOT:
-		fallback_sys_mode = LTE_LC_SYSTEM_MODE_LTEM;
-		break;
-
-	case LTE_LC_SYSTEM_MODE_LTEM_GPS:
-		fallback_sys_mode = LTE_LC_SYSTEM_MODE_NBIOT_GPS;
-		break;
-
-	case LTE_LC_SYSTEM_MODE_NBIOT_GPS:
-		fallback_sys_mode = LTE_LC_SYSTEM_MODE_LTEM_GPS;
-		break;
-
-	default:
-		LOG_WRN("Fallback enabled, but not possible from current system mode %d",
-			lte_lc_sys_mode);
-		return -EINVAL;
-	}
-
-	err = nrf_modem_at_printf("AT%%XSYSTEMMODE=%s,%c",
-				  system_mode_params[fallback_sys_mode],
-				  system_mode_preference[lte_lc_sys_mode_pref]);
-	if (err) {
-		LOG_ERR("Failed to set system mode, error: %d", err);
-		return -EFAULT;
-	}
-
-	LOG_DBG("Trying fallback, system mode set to %d, preference %d",
-		fallback_sys_mode, lte_lc_sys_mode_pref);
-
-	return 0;
-}
-
 static int connect_lte(bool blocking)
 {
 	int err;
 	enum lte_lc_func_mode original_func_mode;
+	bool func_mode_changed = false;
 	enum lte_lc_nw_reg_status reg_status;
 	static atomic_t in_progress;
 
 	/* Check if a connection attempt is already in progress */
 	if (atomic_set(&in_progress, 1)) {
+		LOG_WRN("Connect already in progress");
 		return -EINPROGRESS;
 	}
 
@@ -744,25 +721,6 @@ static int connect_lte(bool blocking)
 		goto exit;
 	}
 
-	if (lte_lc_sys_mode != LTE_LC_SYSTEM_MODE_DEFAULT &&
-	    IS_ENABLED(CONFIG_LTE_NETWORK_USE_FALLBACK)) {
-		/* Set system mode, because it may have been changed by fallback. */
-		if (original_func_mode != LTE_LC_FUNC_MODE_POWER_OFF &&
-		    original_func_mode != LTE_LC_FUNC_MODE_OFFLINE) {
-			err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_OFFLINE);
-			if (err) {
-				err = -EFAULT;
-				goto exit;
-			}
-		}
-
-		err = lte_lc_system_mode_set(lte_lc_sys_mode, lte_lc_sys_mode_pref);
-		if (err) {
-			err = -EFAULT;
-			goto exit;
-		}
-	}
-
 	/* Reset the semaphore, it may have already been given by an earlier +CEREG notification. */
 	k_sem_reset(&link);
 
@@ -771,41 +729,16 @@ static int connect_lte(bool blocking)
 		goto exit;
 	}
 
+	func_mode_changed = true;
+
 	err = k_sem_take(&link, K_SECONDS(CONFIG_LTE_NETWORK_TIMEOUT));
 	if (err == -EAGAIN) {
 		LOG_INF("Network connection attempt timed out");
 		err = -ETIMEDOUT;
-
-		if (IS_ENABLED(CONFIG_LTE_NETWORK_USE_FALLBACK)) {
-			err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_OFFLINE);
-			if (err) {
-				err = -EFAULT;
-				goto exit;
-			}
-
-			err = fallback_system_mode_set();
-			if (err) {
-				err = -ETIMEDOUT;
-				goto exit;
-			}
-
-			k_sem_reset(&link);
-
-			err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_NORMAL);
-			if (err || !blocking) {
-				goto exit;
-			}
-
-			err = k_sem_take(&link, K_SECONDS(CONFIG_LTE_NETWORK_TIMEOUT));
-			if (err == -EAGAIN) {
-				LOG_INF("Network connection attempt timed out");
-				err = -ETIMEDOUT;
-			}
-		}
 	}
 
 exit:
-	if (err) {
+	if (err && func_mode_changed) {
 		/* Connecting to LTE network failed, restore original functional mode. */
 		lte_lc_func_mode_set(original_func_mode);
 	}
@@ -821,11 +754,6 @@ static int feaconf_write(enum feaconf_feat feat, bool state)
 }
 
 /* Public API */
-
-int lte_lc_init(void)
-{
-	return 0;
-}
 
 void lte_lc_register_handler(lte_lc_evt_handler_t handler)
 {
@@ -850,16 +778,13 @@ int lte_lc_deregister_handler(lte_lc_evt_handler_t handler)
 
 int lte_lc_connect(void)
 {
-	return connect_lte(true);
-}
-
-int lte_lc_init_and_connect(void)
-{
+	LOG_DBG("Connecting synchronously");
 	return connect_lte(true);
 }
 
 int lte_lc_connect_async(lte_lc_evt_handler_t handler)
 {
+	LOG_DBG("Connecting asynchronously");
 	if (handler) {
 		event_handler_list_append_handler(handler);
 	} else if (event_handler_list_is_empty()) {
@@ -868,16 +793,6 @@ int lte_lc_connect_async(lte_lc_evt_handler_t handler)
 	}
 
 	return connect_lte(false);
-}
-
-int lte_lc_init_and_connect_async(lte_lc_evt_handler_t handler)
-{
-	return lte_lc_connect_async(handler);
-}
-
-int lte_lc_deinit(void)
-{
-	return lte_lc_power_off();
 }
 
 int lte_lc_normal(void)
@@ -974,12 +889,13 @@ int lte_lc_psm_get(int *tau, int *active_time)
 {
 	int err;
 	struct lte_lc_psm_cfg psm_cfg;
+	struct at_parser parser;
 	char active_time_str[9] = {0};
 	char tau_ext_str[9] = {0};
 	char tau_legacy_str[9] = {0};
+	int len;
+	int reg_status = 0;
 	static char response[160] = { 0 };
-	const char ch = ',';
-	char *comma_ptr;
 
 	if ((tau == NULL) || (active_time == NULL)) {
 		return -EINVAL;
@@ -988,7 +904,7 @@ int lte_lc_psm_get(int *tau, int *active_time)
 	/* Format of XMONITOR AT command response:
 	 * %XMONITOR: <reg_status>,[<full_name>,<short_name>,<plmn>,<tac>,<AcT>,<band>,<cell_id>,
 	 * <phys_cell_id>,<EARFCN>,<rsrp>,<snr>,<NW-provided_eDRX_value>,<Active-Time>,
-	 * <Periodic-TAUext>,<Periodic-TAU>]
+	 * <Periodic-TAU-ext>,<Periodic-TAU>]
 	 * We need to parse the three last parameters, Active-Time, Periodic-TAU-ext and
 	 * Periodic-TAU.
 	 */
@@ -1001,59 +917,48 @@ int lte_lc_psm_get(int *tau, int *active_time)
 		return -EFAULT;
 	}
 
-	comma_ptr = strchr(response, ch);
-	if (!comma_ptr) {
-		/* Not an AT error, thus must be that just a <reg_status> received:
-		 * optional part is included in a response only when <reg_status> is 1 or 5.
-		 */
-		LOG_DBG("Not registered: cannot get current PSM configuration");
+	err = at_parser_init(&parser, response);
+	__ASSERT_NO_MSG(err == 0);
+
+	/* Check registration status */
+	err = at_parser_num_get(&parser, 1, &reg_status);
+	if (err) {
+		LOG_ERR("AT command parsing failed, error: %d", err);
+		return -EBADMSG;
+	} else if (reg_status != LTE_LC_NW_REG_REGISTERED_HOME &&
+		   reg_status != LTE_LC_NW_REG_REGISTERED_ROAMING) {
+		LOG_WRN("No PSM parameters because device not registered, status: %d", reg_status);
 		return -EBADMSG;
 	}
 
-	/* Skip over first 13 fields in AT cmd response by counting delimiters (commas). */
-	for (int i = 0; i < 12; i++) {
-		if (comma_ptr) {
-			comma_ptr = strchr(comma_ptr + 1, ch);
-		} else {
-			LOG_ERR("AT command parsing failed");
-			return -EBADMSG;
-		}
-	}
-
-	/* The last three fields of AT response looks something like this:
-	 * ,"00011110","00000111","01001001"
-	 * comma_ptr now points the comma before Active-Time. Discard the comma and the quote mark,
-	 * hence + 2, and copy Active-Time into active_time_str. Find the next comma and repeat for
-	 * Periodic-TAU-ext and so forth.
-	 */
-
-	if (comma_ptr) {
-		strncpy(active_time_str, comma_ptr + 2, 8);
-	} else {
-		LOG_ERR("AT command parsing failed");
+	/* <Active-Time> */
+	len = sizeof(active_time_str);
+	err = at_parser_string_get(&parser, 14, active_time_str, &len);
+	if (err) {
+		LOG_ERR("AT command parsing failed, error: %d", err);
 		return -EBADMSG;
 	}
 
-	comma_ptr = strchr(comma_ptr + 1, ch);
-	if (comma_ptr) {
-		strncpy(tau_ext_str, comma_ptr + 2, 8);
-	} else {
-		LOG_ERR("AT command parsing failed");
+	/* <Periodic-TAU-ext> */
+	len = sizeof(tau_ext_str);
+	err = at_parser_string_get(&parser, 15, tau_ext_str, &len);
+	if (err) {
+		LOG_ERR("AT command parsing failed, error: %d", err);
 		return -EBADMSG;
 	}
 
-	comma_ptr = strchr(comma_ptr + 1, ch);
-	if (comma_ptr) {
-		strncpy(tau_legacy_str, comma_ptr + 2, 8);
-	} else {
-		LOG_ERR("AT command parsing failed");
+	/* <Periodic-TAU> */
+	len = sizeof(tau_legacy_str);
+	err = at_parser_string_get(&parser, 16, tau_legacy_str, &len);
+	if (err) {
+		LOG_ERR("AT command parsing failed, error: %d", err);
 		return -EBADMSG;
 	}
 
 	err = parse_psm(active_time_str, tau_ext_str, tau_legacy_str, &psm_cfg);
 	if (err) {
 		LOG_ERR("Failed to parse PSM configuration, error: %d", err);
-		return err;
+		return -EBADMSG;
 	}
 
 	*tau = psm_cfg.tau;
@@ -1136,6 +1041,19 @@ int lte_lc_edrx_req(bool enable)
 	int err = 0;
 	int actt[] = {AT_CEDRXS_ACTT_WB, AT_CEDRXS_ACTT_NB};
 
+	LOG_DBG("enable=%d, "
+		"requested_edrx_value_ltem=%s, edrx_value_ltem=%s, "
+		"requested_ptw_value_ltem=%s, ptw_value_ltem=%s, ",
+		enable,
+		requested_edrx_value_ltem, edrx_value_ltem,
+		requested_ptw_value_ltem, ptw_value_ltem);
+	LOG_DBG("enable=%d, "
+		"requested_edrx_value_nbiot=%s, edrx_value_nbiot=%s, "
+		"requested_ptw_value_nbiot=%s, ptw_value_nbiot=%s",
+		enable,
+		requested_edrx_value_nbiot, edrx_value_nbiot,
+		requested_ptw_value_nbiot, ptw_value_nbiot);
+
 	requested_edrx_enable = enable;
 
 	if (!enable) {
@@ -1202,14 +1120,9 @@ int lte_lc_edrx_get(struct lte_lc_edrx_cfg *edrx_cfg)
 		return -EBADMSG;
 	}
 
-	lte_lc_edrx_values_store(prev_lte_mode, edrx_value, ptw_value);
+	lte_lc_edrx_values_store(edrx_cfg->mode, edrx_value, ptw_value);
 
 	return 0;
-}
-
-static void lte_lc_edrx_req_work_fn(struct k_work *work_item)
-{
-	lte_lc_edrx_req(requested_edrx_enable);
 }
 
 #if defined(CONFIG_UNITY)
@@ -1228,7 +1141,11 @@ static void lte_lc_edrx_on_modem_cfun(int mode, void *ctx)
 	 */
 	if (mode == LTE_LC_FUNC_MODE_POWER_OFF && requested_edrx_enable) {
 		lte_lc_edrx_current_values_clear();
-		k_work_submit_to_queue(&lte_lc_work_q, &lte_lc_edrx_req_work);
+		/* We want to avoid sending AT commands in the callback. However,
+		 * when modem is powered off, we are not expecting AT notifications
+		 * that could cause an assertion or missing notification.
+		 */
+		lte_lc_edrx_req(requested_edrx_enable);
 	}
 }
 
@@ -1478,6 +1395,8 @@ int lte_lc_func_mode_set(enum lte_lc_func_mode mode)
 		return -EFAULT;
 	}
 
+	LOG_DBG("Functional mode set to %d", mode);
+
 	return 0;
 }
 
@@ -1533,11 +1452,28 @@ int lte_lc_neighbor_cell_measurement(struct lte_lc_ncellmeas_params *params)
 		.gci_count = 0,
 	};
 
+	if (params == NULL) {
+		LOG_DBG("Using default parameters");
+	}
+	LOG_DBG("Search type=%d, gci_count=%d",
+		params != NULL ? params->search_type : used_params.search_type,
+		params != NULL ? params->gci_count : used_params.gci_count);
+
 	__ASSERT(!IN_RANGE(
 			(int)params,
 			LTE_LC_NEIGHBOR_SEARCH_TYPE_DEFAULT,
 			LTE_LC_NEIGHBOR_SEARCH_TYPE_GCI_EXTENDED_COMPLETE),
 		 "Invalid argument, API does not accept enum values directly anymore");
+
+	if (params != NULL &&
+	    (params->search_type == LTE_LC_NEIGHBOR_SEARCH_TYPE_GCI_DEFAULT ||
+	     params->search_type == LTE_LC_NEIGHBOR_SEARCH_TYPE_GCI_EXTENDED_LIGHT ||
+	     params->search_type == LTE_LC_NEIGHBOR_SEARCH_TYPE_GCI_EXTENDED_COMPLETE)) {
+		if (params->gci_count < 2 || params->gci_count > 15) {
+			LOG_ERR("Invalid GCI count, must be in range 2-15");
+			return -EINVAL;
+		}
+	}
 
 	if (k_sem_take(&ncellmeas_idle_sem, K_SECONDS(1)) != 0) {
 		LOG_WRN("Neighbor cell measurement already in progress");
@@ -1547,6 +1483,7 @@ int lte_lc_neighbor_cell_measurement(struct lte_lc_ncellmeas_params *params)
 	if (params != NULL) {
 		used_params = *params;
 	}
+	ncellmeas_params = used_params;
 
 	/* Starting from modem firmware v1.3.1, there is an optional parameter to specify
 	 * the type of search.
@@ -1571,10 +1508,9 @@ int lte_lc_neighbor_cell_measurement(struct lte_lc_ncellmeas_params *params)
 	}
 
 	if (err) {
+		LOG_ERR("Sending AT%%NCELLMEAS failed, error: %d", err);
 		err = -EFAULT;
 		k_sem_give(&ncellmeas_idle_sem);
-	} else {
-		ncellmeas_params = used_params;
 	}
 
 	return err;
@@ -1582,6 +1518,8 @@ int lte_lc_neighbor_cell_measurement(struct lte_lc_ncellmeas_params *params)
 
 int lte_lc_neighbor_cell_measurement_cancel(void)
 {
+	LOG_DBG("Cancelling");
+
 	int err = nrf_modem_at_printf(AT_NCELLMEAS_STOP);
 
 	if (err) {
@@ -1756,7 +1694,7 @@ int lte_lc_periodic_search_set(const struct lte_lc_periodic_search_cfg *const cf
 		return -EFAULT;
 	} else if (err > 0) {
 		/* The modem responded with "ERROR". */
-		LOG_ERR("The modem rejected the configuration");
+		LOG_ERR("The modem rejected the configuration, err: %d", err);
 		return -EBADMSG;
 	}
 
@@ -1815,7 +1753,7 @@ int lte_lc_periodic_search_get(struct lte_lc_periodic_search_cfg *const cfg)
 	} else if (err < 0) {
 		return -EFAULT;
 	} else if (err < 4) {
-		/* No pattern found */
+		/* Not all parameters and at least one pattern found */
 		return -EBADMSG;
 	}
 
@@ -1826,14 +1764,12 @@ int lte_lc_periodic_search_get(struct lte_lc_periodic_search_cfg *const cfg)
 	 */
 	cfg->pattern_count = err - 3;
 
-	if (cfg->pattern_count >= 1) {
-		LOG_DBG("Pattern 1: %s", pattern_buf[0]);
+	LOG_DBG("Pattern 1: %s", pattern_buf[0]);
 
-		err = parse_periodic_search_pattern(pattern_buf[0], &cfg->patterns[0]);
-		if (err) {
-			LOG_ERR("Failed to parse periodic search pattern");
-			return err;
-		}
+	err = parse_periodic_search_pattern(pattern_buf[0], &cfg->patterns[0]);
+	if (err) {
+		LOG_ERR("Failed to parse periodic search pattern");
+		return err;
 	}
 
 	if (cfg->pattern_count >= 2) {

@@ -48,7 +48,7 @@ To use this configuration, run the following command:
 
 .. code-block:: console
 
-   west build -b nrf5340dk/nrf5340/cpuapp -- -DEXTRA_CONF_FILE=boards/nrf5340dk_nrf5340_cpuapp_nrf5340_singlecore.conf
+   west build -b nrf5340dk/nrf5340/cpuapp -- -DFILE_SUFFIX=singlecore
 
 Building and running
 ********************
@@ -63,7 +63,7 @@ You can build and flash all the required images by completing the following step
 Complete the following steps to program the sample:
 
       1. Go to the sample directory.
-      #. Open the command line terminal.
+      #. |open_terminal_window_with_environment|
       #. Run the following command to build the application code for the host and the remote:
 
          .. code-block:: console
@@ -75,6 +75,8 @@ Complete the following steps to program the sample:
          .. code-block:: console
 
             west flash
+
+.. include:: /includes/nRF54H20_erase_UICR.txt
 
 Testing
 =======

@@ -21,7 +21,6 @@ _MANIFEST = Manifest.from_file(_NRF_BASE / "west.yml")
 
 ALL_DOCSETS = {
     "nrf": ("nRF Connect SDK", "index", "manifest"),
-    "nrfx": ("nrfx", "index", "hal_nordic"),
     "nrfxlib": ("nrfxlib", "README", "nrfxlib"),
     "zephyr": ("Zephyr Project", "index", "zephyr"),
     "mcuboot": ("MCUboot", "wrapper", "mcuboot"),
@@ -30,6 +29,20 @@ ALL_DOCSETS = {
     "kconfig": ("Kconfig Reference", "index", None),
 }
 """All supported docsets (name: title, home page, manifest project name)."""
+
+OPTIONAL_DOCSETS = {
+    "internal": ("Internal Documentation", "index", "doc-internal"),
+}
+"""Optional docsets (name: title, home page, manifest project name)."""
+
+
+# append optional docsets if they exist
+for docset, props in OPTIONAL_DOCSETS.items():
+    for p in _MANIFEST.projects:
+        if p.name != props[2] or not (Path(p.topdir) / Path(p.path)).exists():
+            continue
+
+        ALL_DOCSETS[docset] = props
 
 
 def get_projdir(docset: str) -> Path:
@@ -135,9 +148,7 @@ def add_announcement_banner(options: dict) -> None:
         options: html theme options.
     """
 
-    msg = "<b>Important: </b>This website will be taken offline by 2024-06-18 and replaced " \
-           "with <a href=\"https://docs.nordicsemi.com/\">docs.nordicsemi.com</a>, " \
-           "where all Nordic technical documentation is already accessible. " \
+    msg = ""
 
-    options["set_default_announcement"] = True
+    options["set_default_announcement"] = False
     options["default_announcement_message"] = msg

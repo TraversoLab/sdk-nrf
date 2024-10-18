@@ -60,6 +60,9 @@ static int settings_set_err;
 
 static bool storage_reset_pass;
 
+/* Account Key storage bond management feature is not yet supported by the unit test. */
+BUILD_ASSERT(!IS_ENABLED(CONFIG_BT_FAST_PAIR_STORAGE_AK_BOND));
+
 
 static int settings_load_stage(size_t len, settings_read_cb read_cb, void *cb_arg)
 {
@@ -127,13 +130,10 @@ static int test_fp_storage_reset_perform(void)
 	return 0;
 }
 
-static void test_fp_storage_reset_prepare(void) {}
-
 /* The name starts with '_0_' so that this module's struct would be first in section (linker sorts
  * entries by name) and its callbacks would be call before other's modules callbacks.
  */
-FP_STORAGE_MANAGER_MODULE_REGISTER(_0_test_reset, test_fp_storage_reset_perform,
-				   test_fp_storage_reset_prepare, NULL, NULL);
+FP_STORAGE_MANAGER_MODULE_REGISTER(_0_test_reset, test_fp_storage_reset_perform, NULL, NULL);
 
 static void *setup_fn(void)
 {
@@ -142,8 +142,6 @@ static void *setup_fn(void)
 	STRUCT_SECTION_GET(fp_storage_manager_module, 0, &module);
 
 	zassert_equal_ptr(test_fp_storage_reset_perform, module->module_reset_perform,
-			  "Invalid order of elements in section");
-	zassert_equal_ptr(test_fp_storage_reset_prepare, module->module_reset_prepare,
 			  "Invalid order of elements in section");
 
 	return NULL;

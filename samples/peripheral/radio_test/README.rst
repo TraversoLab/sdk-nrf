@@ -31,7 +31,7 @@ The sample also requires one of the following testing devices:
 
   * Another development kit with the same sample.
     See :ref:`radio_test_testing_board`.
-  * Another development kit connected to a PC with RSSI Viewer application (available in the `nRF Connect for Desktop`_).
+  * Another development kit connected to a PC with the `RSSI Viewer`_ application (available in the `nRF Connect for Desktop`_).
     See :ref:`radio_test_testing_rssi`.
 
 .. note::
@@ -109,8 +109,8 @@ User interface
      - <duty_cycle>
      - Duty cycle in percent (two decimal digits, between 01 and 90).
    * - start_rx
-     -
-     - Start RX.
+     - <packet_num>
+     - Start RX (continuous RX mode is used if no argument is provided).
    * - start_rx_sweep
      -
      - Start the RX sweep.
@@ -215,6 +215,8 @@ You can use the following command:
 
    west build samples/peripheral/radio_test -b nrf5340dk/nrf5340/cpunet -- -DSHIELD=nrf21540ek -DFILE_SUFFIX=usb
 
+.. include:: /includes/nRF54H20_erase_UICR.txt
+
 .. note::
    You can also build the sample with the remote IPC Service Shell for the |nRF7002DKnoref| using the ``nrf7002dk/nrf5340/cpunet`` board target in the commands.
 
@@ -232,6 +234,8 @@ After programming the sample to your development kit, complete the following ste
 
 Testing with another development kit
 ------------------------------------
+
+Complete the following steps:
 
 1. Connect both development kits to the computer using a USB cable.
    The kits are assigned a COM port (Windows) or ttyACM device (Linux), which is visible in the Device Manager.
@@ -253,6 +257,8 @@ Testing with another development kit
 Testing with RSSI Viewer
 ------------------------
 
+Complete the following steps:
+
 1. Connect the kit to the computer using a USB cable.
    The kit is assigned a COM port (Windows) or ttyACM device (Linux), which is visible in the Device Manager.
 #. |connect_terminal_ANSI|
@@ -260,7 +266,7 @@ Testing with RSSI Viewer
 #. Set the end channel with the ``end_channel`` command to 60.
 #. Set the time on channel with the ``time_on_channel`` command to 50 ms.
 #. Set the kit in the TX sweep mode using the ``start_tx_sweep`` command.
-#. Start the RSSI Viewer application and select the kit to communicate with.
+#. Start the `RSSI Viewer`_ application and select the kit to communicate with.
 #. On the application chart, observe the TX sweep in the form of a wave that starts at 2420 MHz frequency and ends with 2480 MHz.
 
 Dependencies

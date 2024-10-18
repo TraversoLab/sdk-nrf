@@ -272,6 +272,7 @@ static volatile uint32_t last_tx_attempts;
 static volatile uint32_t wait_for_ack_timeout_us;
 
 static uint32_t radio_shorts_common = RADIO_SHORTS_COMMON;
+static const bool fast_switching = IS_ENABLED(CONFIG_ESB_FAST_SWITCHING);
 
 static const mpsl_fem_event_t rx_event = {
 	.type = MPSL_FEM_EVENT_TYPE_TIMER,
@@ -411,7 +412,9 @@ static void esb_fem_for_tx_set(bool ack)
 		 * when this event occurs. The timer value must be big enough to give us possibility
 		 * to reconfigure timer shorts before timer will be cleared by them.
 		 */
-		nrf_timer_cc_set(esb_timer.p_reg, NRF_TIMER_CC_CHANNEL2, TX_RAMP_UP_TIME_US);
+		uint16_t ramp_up = esb_cfg.use_fast_ramp_up ? TX_FAST_RAMP_UP_TIME_US :
+							      TX_RAMP_UP_TIME_US;
+		nrf_timer_cc_set(esb_timer.p_reg, NRF_TIMER_CC_CHANNEL2, ramp_up);
 	}
 
 	nrf_timer_shorts_set(esb_timer.p_reg, timer_shorts);
@@ -543,6 +546,24 @@ static void update_rf_payload_format_esb_dpl(uint32_t payload_length)
 	packet_config.balen = (esb_addr.addr_length - 1);
 	packet_config.statlen = 0;
 	packet_config.maxlen = CONFIG_ESB_MAX_PAYLOAD_LENGTH;
+#if defined(RADIO_PCNF0_PLEN_Msk)
+	if (esb_cfg.bitrate == ESB_BITRATE_2MBPS) {
+		packet_config.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+	}
+
+#if defined(RADIO_MODE_MODE_Ble_2Mbit)
+	if (esb_cfg.bitrate == ESB_BITRATE_2MBPS_BLE) {
+		packet_config.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+	}
+#endif /* defined(RADIO_MODE_MODE_Ble_2Mbit) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) || defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	if (esb_cfg.bitrate == ESB_BITRATE_4MBPS) {
+		packet_config.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+	}
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) || defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+
+#endif /* defined(RADIO_PCNF0_PLEN_Msk) */
 
 	nrf_radio_packet_configure(NRF_RADIO, &packet_config);
 }
@@ -590,6 +611,11 @@ static void update_radio_addresses(uint8_t update_mask)
 static nrf_radio_txpower_t dbm_to_nrf_radio_txpower(int8_t tx_power)
 {
 	switch (tx_power) {
+#if defined(RADIO_TXPOWER_TXPOWER_Neg100dBm)
+	case -100:
+		return RADIO_TXPOWER_TXPOWER_Neg100dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg100dBm) */
+
 #if defined(RADIO_TXPOWER_TXPOWER_Neg70dBm)
 	case -70:
 		return RADIO_TXPOWER_TXPOWER_Neg70dBm;
@@ -608,13 +634,23 @@ static nrf_radio_txpower_t dbm_to_nrf_radio_txpower(int8_t tx_power)
 		return RADIO_TXPOWER_TXPOWER_Neg30dBm;
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg30dBm) */
 
-#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm)
-	case -26:
-		return RADIO_TXPOWER_TXPOWER_Neg26dBm;
-#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) */
+#if defined(RADIO_TXPOWER_TXPOWER_Neg28dBm)
+	case -28:
+		return RADIO_TXPOWER_TXPOWER_Neg28dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg28dBm) */
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg22dBm)
+	case -22:
+		return RADIO_TXPOWER_TXPOWER_Neg22dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg22dBm) */
 
 	case -20:
 		return RADIO_TXPOWER_TXPOWER_Neg20dBm;
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg18dBm)
+	case -18:
+		return RADIO_TXPOWER_TXPOWER_Neg18dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg18dBm) */
 
 	case -16:
 		return RADIO_TXPOWER_TXPOWER_Neg16dBm;
@@ -771,11 +807,11 @@ static bool update_radio_bitrate(void)
 
 	switch (esb_cfg.bitrate) {
 
-#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_5)
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) || defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
 	case ESB_BITRATE_4MBPS:
 		wait_for_ack_timeout_us = RX_ACK_TIMEOUT_US_4MBPS;
 		break;
-#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) */
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) || define(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
 
 	case ESB_BITRATE_2MBPS:
 
@@ -1084,7 +1120,8 @@ static void start_tx_transaction(void)
 						(esb_state == ESB_STATE_PTX_TX));
 			esb_state = ESB_STATE_PTX_TX;
 		} else {
-			nrf_radio_shorts_set(NRF_RADIO, radio_shorts_common);
+			nrf_radio_shorts_set(NRF_RADIO, radio_shorts_common |
+					     ESB_SHORT_DISABLE_MASK);
 
 			on_radio_disabled = on_radio_disabled_tx_noack;
 			esb_state = ESB_STATE_PTX_TX;
@@ -1119,7 +1156,7 @@ static void start_tx_transaction(void)
 	if (is_tx_idle) {
 		nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_START);
 	} else {
-		esb_ppi_for_txrx_set(false, ack);
+		esb_ppi_for_txrx_set(false, ack, fast_switching && ack);
 		esb_fem_for_tx_set(ack);
 
 		radio_start();
@@ -1156,7 +1193,7 @@ static void on_radio_end_tx_noack(void)
 static void on_radio_disabled_tx_noack(void)
 {
 	esb_fem_pa_reset();
-	esb_ppi_for_txrx_clear(false, false);
+	esb_ppi_for_txrx_clear(false, false, false);
 
 	interrupt_flags |= INT_TX_SUCCESS_MSK;
 	tx_fifo_remove_last();
@@ -1172,7 +1209,7 @@ static void on_radio_disabled_tx_noack(void)
 
 static void on_radio_disabled_tx(void)
 {
-	esb_ppi_for_txrx_clear(false, true);
+	esb_ppi_for_txrx_clear(false, true, fast_switching);
 	/* The timer was triggered on radio disabled event so we can clear PPI connections here. */
 	esb_ppi_for_fem_clear();
 	esb_fem_for_rx_ack();
@@ -1308,7 +1345,7 @@ static void on_radio_disabled_tx_wait_for_ack(void)
 				esb_ppi_for_retransmission_clear();
 
 				/* Start radio here. */
-				esb_ppi_for_txrx_set(false, true);
+				esb_ppi_for_txrx_set(false, true, fast_switching);
 				esb_fem_for_tx_set(true);
 
 				radio_start();
@@ -1320,7 +1357,7 @@ static void on_radio_disabled_tx_wait_for_ack(void)
 static void clear_events_restart_rx(void)
 {
 	esb_fem_lna_reset();
-	esb_ppi_for_txrx_clear(true, false);
+	esb_ppi_for_txrx_clear(true, false, fast_switching);
 
 	nrf_radio_shorts_set(NRF_RADIO, radio_shorts_common);
 
@@ -1339,7 +1376,7 @@ static void clear_events_restart_rx(void)
 
 	nrf_radio_shorts_set(NRF_RADIO, (radio_shorts_common | NRF_RADIO_SHORT_DISABLED_TXEN_MASK));
 
-	esb_ppi_for_txrx_set(true, false);
+	esb_ppi_for_txrx_set(true, false, fast_switching);
 	esb_fem_for_rx_set();
 
 	radio_start();
@@ -1744,6 +1781,12 @@ int esb_init(const struct esb_config *config)
 		*(volatile uint32_t *)0x4000173C |= (1 << 10);
 	}
 
+#if defined(CONFIG_SOC_SERIES_NRF54HX)
+	/* Apply HMPAN-102 workaround for nRF54H series */
+	*(volatile uint32_t *)0x5302C7E4 =
+				(((*((volatile uint32_t *)0x5302C7E4)) & 0xFF000FFF) | 0x0012C000);
+#endif
+
 	return 0;
 }
 
@@ -1958,7 +2001,7 @@ int esb_start_rx(void)
 	nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_PAYLOAD);
 	nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_DISABLED);
 
-	esb_ppi_for_txrx_set(true, false);
+	esb_ppi_for_txrx_set(true, false, fast_switching);
 	esb_fem_for_rx_set();
 
 	radio_start();
@@ -1972,7 +2015,7 @@ int esb_stop_rx(void)
 		return -EINVAL;
 	}
 
-	esb_ppi_for_txrx_clear(true, false);
+	esb_ppi_for_txrx_clear(true, false, fast_switching);
 	esb_fem_reset();
 
 	nrf_radio_shorts_disable(NRF_RADIO, 0xFFFFFFFF);

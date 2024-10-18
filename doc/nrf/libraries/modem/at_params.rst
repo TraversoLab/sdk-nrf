@@ -25,8 +25,6 @@ API documentation
 *****************
 
 | Header file: :file:`include/modem/at_params.h`
-| Source file: :file:`lib/at_cmd_parser/src/at_params.c`
+| Source file: :file:`lib/at_cmd_parser/at_params.c`
 
 .. doxygengroup:: at_params
-   :project: nrf
-   :members:

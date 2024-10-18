@@ -420,7 +420,7 @@ The information extracted from devicetree is the alignment value for some partit
 
 .. code-block:: yaml
 
-   #include <autoconf.h>
+   #include <zephyr/autoconf.h>
    #include <devicetree_legacy_unfixed.h>
 
    b0:
@@ -561,7 +561,7 @@ After the ``nordic,pm-ext-flash`` value is set, you can place partitions in the 
      You must add a ``chosen`` entry for ``nordic,pm-ext-flash`` in your devicetree to make this option available.
      See :file:`tests/subsys/partition_manager` for example configurations.
 
-   * If the external flash device is not using the :ref:`QSPI NOR <zephyr:dtbinding_nordic_qspi_nor>` driver, you must enable :kconfig:option:`CONFIG_PM_OVERRIDE_EXTERNAL_DRIVER_CHECK` to override the Partition Manager's external flash driver check, and the required driver must also be enabled for all applications that need it.
+   * If the external flash device is not using the :dtcompatible:`nordic,qspi-nor` driver, you must enable :kconfig:option:`CONFIG_PM_OVERRIDE_EXTERNAL_DRIVER_CHECK` to override the Partition Manager's external flash driver check, and the required driver must also be enabled for all applications that need it.
 
 See :ref:`ug_bootloader_external_flash` for more details on using external flash memory with MCUboot.
 
@@ -770,9 +770,9 @@ Configuring static partitions
 Static partitions are defined through a YAML-formatted configuration file in the root application's source directory.
 This file is similar to the regular :file:`pm.yml` configuration files, except that it also defines the start address for all partitions.
 
-You can set ``PM_STATIC_YML_FILE`` to contain exactly the static configuration you want to use.
+You can set :makevar:`PM_STATIC_YML_FILE` to contain exactly the static configuration you want to use.
 
-If you do not set ``PM_STATIC_YML_FILE``, the build system will use the following order to look for files in your application source directory to use as a static configuration layout:
+If you do not set :makevar:`PM_STATIC_YML_FILE`, the build system will use the following order to look for files in your application source directory to use as a static configuration layout:
 
 * If a :ref:`file suffix <app_build_file_suffixes>` is used, the following order applies:
 

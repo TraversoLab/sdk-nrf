@@ -8,6 +8,7 @@
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/services/bas.h>
 
 #include <bluetooth/services/mds.h>
@@ -53,8 +54,8 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 	if (!err) {
 		printk("Security changed: %s level %u\n", addr, level);
 	} else {
-		printk("Security failed: %s level %u err %d\n", addr, level,
-			err);
+		printk("Security failed: %s level %u err %d %s\n", addr, level, err,
+		       bt_security_err_to_str(err));
 	}
 
 	if (level >= BT_SECURITY_L2) {
@@ -69,7 +70,7 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 	char addr[BT_ADDR_LE_STR_LEN];
 
 	if (conn_err) {
-		printk("Connection failed (err %u)\n", conn_err);
+		printk("Connection failed, err 0x%02x %s\n", conn_err, bt_hci_err_to_str(conn_err));
 		return;
 	}
 
@@ -81,7 +82,7 @@ static void connected(struct bt_conn *conn, uint8_t conn_err)
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	printk("Disconnected (reason %u)\n", reason);
+	printk("Disconnected, reason 0x%02x %s\n", reason, bt_hci_err_to_str(reason));
 
 	dk_set_led_off(CON_STATUS_LED);
 
@@ -111,7 +112,8 @@ static void pairing_failed(struct bt_conn *conn, enum bt_security_err reason)
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	printk("Pairing failed conn: %s, reason %d\n", addr, reason);
+	printk("Pairing failed conn: %s, reason %d %s\n", addr, reason,
+	       bt_security_err_to_str(reason));
 
 	if (pairing_confirmation_conn) {
 		pairing_confirmation_conn = NULL;
@@ -141,7 +143,12 @@ static void pairing_confirm(struct bt_conn *conn)
 	pairing_confirmation_conn = conn;
 
 	printk("Pairing confirmation required for %s\n", addr);
-	printk("Press Button 1 to confirm, Button 2 to reject.\n");
+
+	if (IS_ENABLED(CONFIG_SOC_SERIES_NRF54HX) || IS_ENABLED(CONFIG_SOC_SERIES_NRF54LX)) {
+		printk("Press Button 0 to confirm, Button 1 to reject.\n");
+	} else {
+		printk("Press Button 1 to confirm, Button 2 to reject.\n");
+	}
 }
 
 static struct bt_conn_auth_cb conn_auth_callbacks = {
@@ -173,12 +180,12 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 		time_measure_start = !time_measure_start;
 
 		if (time_measure_start) {
-			err = MEMFAULT_METRIC_TIMER_START(button_1_elapsed_time_ms);
+			err = MEMFAULT_METRIC_TIMER_START(button_elapsed_time_ms);
 			if (err) {
 				printk("Failed to start memfault metrics timer: %d\n", err);
 			}
 		} else {
-			err = MEMFAULT_METRIC_TIMER_STOP(button_1_elapsed_time_ms);
+			err = MEMFAULT_METRIC_TIMER_STOP(button_elapsed_time_ms);
 			if (err) {
 				printk("Failed to stop memfault metrics: %d\n", err);
 			}
@@ -204,10 +211,10 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 	if ((has_changed & DK_BTN2_MSK) && !pairing_confirmation_conn) {
 		bool button_state = (buttons & DK_BTN2_MSK) ? 1 : 0;
 
-		MEMFAULT_TRACE_EVENT_WITH_LOG(button_2_state_changed, "Button state: %u",
+		MEMFAULT_TRACE_EVENT_WITH_LOG(button_state_changed, "Button state: %u",
 					      button_state);
 
-		printk("button_2_state_changed event has been tracked, button state: %u\n",
+		printk("button_state_changed event has been tracked, button state: %u\n",
 		       button_state);
 	}
 
@@ -225,11 +232,11 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 	}
 
 	if (buttons & DK_BTN3_MSK) {
-		err = MEMFAULT_METRIC_ADD(button_3_press_count, 1);
+		err = MEMFAULT_METRIC_ADD(button_press_count, 1);
 		if (err) {
-			printk("Failed to increase button_3_press_count metric: %d\n", err);
+			printk("Failed to increase button_press_count metric: %d\n", err);
 		} else {
-			printk("button_3_press_count metric increased\n");
+			printk("button_press_count metric increased\n");
 		}
 	}
 

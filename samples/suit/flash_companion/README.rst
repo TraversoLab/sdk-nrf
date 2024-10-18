@@ -9,6 +9,8 @@ SUIT: Flash companion
 
 The SUIT flash companion sample allows the Secure Domain Firmware to access the external memory during the :ref:`Software Updates for Internet of Things (SUIT) <ug_nrf54h20_suit_dfu>` firmware upgrade.
 
+.. _suit_flash_companion_reqs:
+
 Requirements
 ************
 
@@ -17,6 +19,8 @@ The sample supports the following development kit:
 .. table-from-rows:: /includes/sample_board_rows.txt
    :header: heading
    :rows: nrf54h20dk_nrf54h20_cpuapp
+
+.. _suit_flash_companion_overview:
 
 Overview
 ********
@@ -28,6 +32,8 @@ The sample is meant to be booted by the Secure Domain while performing the firmw
 
 The flash companion sample is not a stand-alone firmware, it is intended to be used with the ``nrf54h_suit_sample`` to complete a firmware transfer with external flash.
 
+.. _suit_flash_companion_config:
+
 Configuration
 *************
 
@@ -36,7 +42,7 @@ Configuration
 Setup
 =====
 
-You can build the sample using :ref:`sysbuild <configuration_system_overview_sysbuild>` by enabling the :kconfig:option:`SB_CONFIG_SUIT_BUILD_FLASH_COMPANION` Kconfig option.
+You can build the sample using :ref:`sysbuild <configuration_system_overview_sysbuild>` by enabling the ``SB_CONFIG_SUIT_BUILD_FLASH_COMPANION`` Kconfig option.
 The memory partition from which the firmware will run can be configured by providing a devicetree overlay through sysbuild.
 You should create a dedicated partition in non-volatile memory and override the ``zephyr,code-partition``.
 The memory partition must not be used by any other firmware image.
@@ -54,6 +60,8 @@ Check and configure the following configuration option:
 SB_CONFIG_SUIT_BUILD_FLASH_COMPANION - Configuration for the firmware
    This option enables the sample and builds it during the sysbuild.
 
+.. _suit_flash_companion_build_run:
+
 Building and running
 ********************
 
@@ -63,7 +71,7 @@ Make sure that both the main application and the flash companion support your ta
 
 Perform the following steps in the main application directory:
 
-1. Enable the :kconfig:option:`SB_CONFIG_SUIT_BUILD_FLASH_COMPANION` sysbuild option.
+1. Enable the ``SB_CONFIG_SUIT_BUILD_FLASH_COMPANION`` sysbuild option.
 
 #. Create :file:`sysbuild/flash_companion.overlay` devicetree overlay file and add the following content:
 

@@ -88,7 +88,8 @@ def __build_cmd_get(core: Core, device: AudioDevice, build: BuildType,
                     pristine, child_image, options):
     if core == Core.app:
         build_cmd = (f"west build {TARGET_CORE_APP_FOLDER} "
-                     f"-b {TARGET_BOARD_NRF5340_AUDIO_DK_APP_NAME}")
+                     f"-b {TARGET_BOARD_NRF5340_AUDIO_DK_APP_NAME} "
+                     f"--sysbuild")
         if device == AudioDevice.headset:
             device_flag = "-DCONFIG_AUDIO_DEV=1"
             dest_folder = TARGET_DEV_HEADSET_FOLDER
@@ -111,8 +112,8 @@ def __build_cmd_get(core: Core, device: AudioDevice, build: BuildType,
             device_flag += " -DCONFIG_NCS_INCLUDE_RPMSG_CHILD_IMAGE=n"
 
         if options.nrf21540:
-            device_flag += " -DSHIELD=nrf21540ek_fwd"
-            device_flag += " -Dhci_ipc_SHIELD=nrf21540ek"
+            device_flag += " -Dnrf5340_audio_SHIELD=nrf21540ek_fwd"
+            device_flag += " -Dipc_radio_SHIELD=nrf21540ek"
 
         if options.custom_bt_name is not None and options.user_bt_name:
             raise Exception(

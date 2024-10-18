@@ -1,8 +1,13 @@
 .. |NCS| replace:: nRF Connect SDK
 
-.. |release| replace:: v2.6.1
-.. |release_tt| replace:: ``v2.6.1``
-.. |release_number_tt| replace:: ``2.6.1``
+.. ### Versions
+
+.. |release| replace:: v2.7.0
+.. |release_tt| replace:: ``v2.7.0``
+.. |release_number_tt| replace:: ``2.7.0``
+
+.. |jlink_ver| replace:: v7.94i
+.. |jlink_ver_vsc| replace:: v7.94i
 
 .. ### Config shortcuts
 
@@ -43,6 +48,8 @@
 
 .. |ANSI| replace:: that supports VT100/ANSI escape characters
 
+.. |open_terminal_window_with_environment| replace:: Start the :ref:`toolchain environment <using_toolchain_environment>` in a terminal window.
+
 .. ### Board shortcuts
 
 .. |nRF5340DKnoref| replace:: nRF5340 DK board (PCA10095)
@@ -82,8 +89,8 @@
 .. ### Zigbee & ZBOSS shortcuts
 
 .. |zigbee_version| replace:: Zigbee 3.0
-.. |zboss_version| replace:: 3.11.3.0
-.. |zigbee_ncp_package_version| replace:: 2.2.2
+.. |zboss_version| replace:: 3.11.4.0
+.. |zigbee_ncp_package_version| replace:: 2.2.3
 .. |zigbee_description| replace:: Zigbee is a portable, low-power software networking protocol that provides connectivity over an 802.15.4-based mesh network.
 .. |enable_zigbee_before_testing| replace:: Make sure to configure the Zigbee stack before building and testing this sample.
    See :ref:`ug_zigbee_configuring` for more information.
@@ -138,6 +145,10 @@
 .. |smp| replace:: simple management protocol module
 .. |usb_state| replace:: USB state module
 .. |usb_state_pm| replace:: USB state power manager module
+.. |nrf_desktop_HID_ref| replace:: Apart from HID samples, the |NCS| provides a complete reference application design of :term:`Human Interface Device (HID)`.
+   Depending on the configuration, the application can work as a desktop mouse, gaming mouse, keyboard, or connection dongle.
+   It supports connection over Bluetooth® LE, USB, or both.
+   For details, see the :ref:`nrf_desktop` documentation.
 
 .. ### Matter shortcuts
 
@@ -197,7 +208,8 @@
    The NFCT driver is part of the nrfx driver package.
    For more information about this driver, see the NFCT driver page in the `nrfx`_ repository.
 
-.. |Supported OS| replace:: The operating system versions that support the |NCS| tools are listed in the :ref:`supported_OS` section.
+.. |Supported OS| replace:: The operating system versions that support the |NCS| firmware are listed in the :ref:`supported_OS` section.
+   Some additional tools for working with Nordic Semiconductor devices might have :ref:`different OS requirements <additional_nordic_sw_tools_os_support>`.
 
 .. |no_changes_yet_note| replace:: No changes since the latest |NCS| release.
 
@@ -212,10 +224,26 @@
 
 .. |sysbuild_related_deprecation_note| replace:: This feature is deprecated and is being replaced by Zephyr's :ref:`zephyr:sysbuild`.
    You can continue to use it until the transition is complete in the |NCS| and the feature is removed in one of the upcoming |NCS| releases.
+   For more information, see :ref:`zephyr:sysbuild`, :ref:`sysbuild_images`, :ref:`zephyr_samples_sysbuild`, and :ref:`sysbuild_forced_options`.
 
-.. |sysbuild_autoenabled_ncs| replace:: In the :ref:`nRF repositories <dm_repo_types>`, building with sysbuild is :ref:`enabled by default <sysbuild_enabled_ncs>`.
+.. |sysbuild_autoenabled_ncs| replace:: When building :ref:`repository applications <create_application_types_repository>` in the :ref:`SDK repositories <dm_repo_types>`, building with sysbuild is :ref:`enabled by default <sysbuild_enabled_ncs>`.
+   If you work with out-of-tree :ref:`freestanding applications <create_application_types_freestanding>`, you need to manually pass the ``--sysbuild`` parameter to every build command or :ref:`configure west to always use it <sysbuild_enabled_ncs_configuring>`.
+
+.. |parameters_override_west_config| replace:: The parameters and options passed in the command line always take precedence over ``west config`` settings.
 
 .. |file_suffix_related_deprecation_note| replace:: This feature is deprecated and is being replaced by :ref:`suffix-based configurations <app_build_file_suffixes>`.
     You can continue to use it until the transition is complete in the |NCS| and the feature is removed in one of the upcoming |NCS| releases.
 
 .. |multi_image| replace:: These samples are built for the application core and, by default, include the network core application as child image in a multi-image build (see :ref:`ug_nrf5340_multi_image`).
+
+.. |migration_contact_devzone| replace:: While we strive to document all breaking changes, the migration guides might not include the detailed migration steps for your use case.
+   If you need assistance, contact Nordic Semiconductor's technical support on `DevZone`_.
+
+.. |nrf54_buttons_leds_numbering| replace:: The nRF54 DKs use a different numbering pattern for LED and buttons.
+   See the User interface section for full overview.
+
+.. |ATv2_maintenance_note| replace:: The Asset Tracker v2 application is in maintenance mode.
+   For new projects, it is recommended to use the :ref:`nrf_cloud_multi_service` sample instead.
+
+.. |toolchain_management_ncs_versions| replace:: The Toolchain Manager installation is recommended only when using the nRF54H20 DK with the |NCS| v2.7.0.
+   When using any other DK, the Toolchain Manager installation is recommended for the |NCS| v1.9.x and earlier versions.

@@ -141,10 +141,12 @@ int fp_storage_ak_find(struct fp_account_key *account_key,
 	return -ESRCH;
 }
 
-int fp_storage_ak_save(const struct fp_account_key *account_key)
+int fp_storage_ak_save(const struct fp_account_key *account_key, const void *conn_ctx)
 {
 	int err;
 	struct account_key_data data;
+
+	ARG_UNUSED(conn_ctx);
 
 	if (!is_enabled) {
 		return -EACCES;
@@ -232,6 +234,13 @@ static int fp_storage_ak_reset(void)
 	int err;
 	bool was_enabled = is_enabled;
 
+	if (was_enabled) {
+		err = fp_storage_ak_uninit();
+		if (err) {
+			return err;
+		}
+	}
+
 	err = fp_storage_owner_ak_delete();
 	if (err) {
 		return err;
@@ -248,11 +257,6 @@ static int fp_storage_ak_reset(void)
 	return 0;
 }
 
-static void reset_prepare_set(void)
-{
-	/* intentionally left empty */
-}
-
 SETTINGS_STATIC_HANDLER_DEFINE(fp_storage_ak_minimal,
 			       SETTINGS_AK_SUBTREE_NAME,
 			       NULL,
@@ -262,6 +266,5 @@ SETTINGS_STATIC_HANDLER_DEFINE(fp_storage_ak_minimal,
 
 FP_STORAGE_MANAGER_MODULE_REGISTER(fp_storage_ak_minimal,
 				   fp_storage_ak_reset,
-				   reset_prepare_set,
 				   fp_storage_ak_init,
 				   fp_storage_ak_uninit);

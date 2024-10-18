@@ -12,6 +12,7 @@
 #include "common.h"
 #include "cracen_psa.h"
 #include "cracen_psa_primitives.h"
+#include <sxsymcrypt/blkcipher.h>
 #include <cracen/statuscodes.h>
 #include <security/cracen.h>
 #include <sicrypto/sicrypto.h>
@@ -81,7 +82,8 @@ static psa_status_t ctr_drbg_update(uint8_t *data)
 {
 	psa_status_t status = SX_OK;
 
-	char temp[CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE];
+	char temp[CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE] __aligned(
+		CONFIG_DCACHE_LINE_SIZE);
 	size_t temp_length = 0;
 
 	psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
@@ -90,24 +92,17 @@ static psa_status_t ctr_drbg_update(uint8_t *data)
 	psa_set_key_bits(&attr, PSA_BYTES_TO_BITS(sizeof(prng.key)));
 	psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT);
 
-	struct sxkeyref keyref;
-
-	status = cracen_load_keyref(&attr, prng.key, sizeof(prng.key), &keyref);
-	if (status != PSA_SUCCESS) {
-		return status;
-	}
-
 	while (temp_length < sizeof(temp)) {
 		si_be_add(prng.V, SX_BLKCIPHER_AES_BLK_SZ, 1);
-		size_t outlen;
+		_Static_assert((sizeof(temp) % SX_BLKCIPHER_AES_BLK_SZ) == 0);
 
-		status = cracen_cipher_crypt_ecb(&keyref, prng.V, sizeof(prng.V), temp,
-						 SX_BLKCIPHER_AES_BLK_SZ, &outlen, CRACEN_ENCRYPT,
-						 BA411_AES_COUNTERMEASURES_DISABLE);
+		status = sx_blkcipher_ecb_simple(prng.key, sizeof(prng.key), prng.V, sizeof(prng.V),
+						 temp + temp_length, SX_BLKCIPHER_AES_BLK_SZ);
+
 		if (status != PSA_SUCCESS) {
 			return status;
 		}
-		temp_length += outlen;
+		temp_length += SX_BLKCIPHER_AES_BLK_SZ;
 	}
 
 	if (data) {
@@ -134,7 +129,7 @@ psa_status_t cracen_init_random(cracen_prng_context_t *context)
 		return PSA_SUCCESS;
 	}
 
-	nrf_security_mutex_lock(cracen_prng_context_mutex);
+	nrf_security_mutex_lock(&cracen_prng_context_mutex);
 	safe_memset(&prng, sizeof(prng), 0, sizeof(prng));
 
 	/* Get the entropy used to seed the DRBG */
@@ -158,7 +153,7 @@ psa_status_t cracen_init_random(cracen_prng_context_t *context)
 	prng.initialized = CRACEN_PRNG_INITIALIZED;
 
 exit:
-	nrf_security_mutex_unlock(cracen_prng_context_mutex);
+	nrf_security_mutex_unlock(&cracen_prng_context_mutex);
 
 	return silex_statuscodes_to_psa(sx_err);
 }
@@ -169,7 +164,6 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 
 	psa_status_t status = PSA_SUCCESS;
 	size_t len_left = output_size;
-	struct sxkeyref keyref;
 
 	if (output_size > 0 && output == NULL) {
 		return PSA_ERROR_INVALID_ARGUMENT;
@@ -179,7 +173,7 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 		return PSA_ERROR_INVALID_ARGUMENT;
 	}
 
-	nrf_security_mutex_lock(cracen_prng_context_mutex);
+	nrf_security_mutex_lock(&cracen_prng_context_mutex);
 
 	if (prng.reseed_counter == 0) {
 		status = cracen_init_random(context);
@@ -212,21 +206,17 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 	psa_set_key_bits(&attr, PSA_BYTES_TO_BITS(sizeof(prng.key)));
 	psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT);
 
-	status = cracen_load_keyref(&attr, prng.key, sizeof(prng.key), &keyref);
-
 	if (status != PSA_SUCCESS) {
 		return status;
 	}
 
 	while (len_left > 0) {
 		size_t cur_len = MIN(len_left, SX_BLKCIPHER_AES_BLK_SZ);
-		char temp[SX_BLKCIPHER_AES_BLK_SZ];
-		size_t outlen;
+		char temp[SX_BLKCIPHER_AES_BLK_SZ] __aligned(CONFIG_DCACHE_LINE_SIZE);
 
 		si_be_add(prng.V, SX_BLKCIPHER_AES_BLK_SZ, 1);
-		status = cracen_cipher_crypt_ecb(&keyref, prng.V, sizeof(prng.V), temp,
-						 SX_BLKCIPHER_AES_BLK_SZ, &outlen, CRACEN_ENCRYPT,
-						 BA411_AES_COUNTERMEASURES_DISABLE);
+		status = sx_blkcipher_ecb_simple(prng.key, sizeof(prng.key), prng.V, sizeof(prng.V),
+						 temp, sizeof(temp));
 
 		if (status != PSA_SUCCESS) {
 			goto exit;
@@ -248,7 +238,7 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 	prng.reseed_counter += 1;
 
 exit:
-	nrf_security_mutex_unlock(cracen_prng_context_mutex);
+	nrf_security_mutex_unlock(&cracen_prng_context_mutex);
 	return status;
 }
 

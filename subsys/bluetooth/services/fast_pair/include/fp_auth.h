@@ -29,8 +29,12 @@ extern "C" {
 /** Start Fast Pair Bluetooth authentication procedure.
  *
  * The Fast Pair authentication subsystem takes over Zephyr Bluetooth authentication callbacks to
- * perform Bluetooth pairing according to the Fast Pair procedure. The procedure can be used only
- * if connected peer is Fast Pair Seeker. Otherwise regular pairing must be used.
+ * perform Bluetooth pairing according to the Fast Pair procedure. The procedure can be used only if
+ * connected peer is Fast Pair Seeker. Otherwise regular pairing must be used.
+ *
+ * If the CONFIG_BT_FAST_PAIR_BOND_MANAGER Kconfig is enabled, the subsystem also uses the Fast Pair
+ * Keys module to save Account Key association with the potential Bluetooth bond in the Account Key
+ * storage module.
  *
  * @param[in] conn		Pointer to Bluetooth connection (determines Fast Pair Seeker).
  * @param[in] send_pairing_req	Boolean informing if Provider should send pairing request.
@@ -49,7 +53,7 @@ int fp_auth_start(struct bt_conn *conn, bool send_pairing_req);
  *
  * @param[in] conn		Pointer to Bluetooth connection (determines Fast Pair Seeker).
  * @param[in] gatt_passkey	Value providing passkey received over GATT.
- * @param[out] bt_aut_passkey	Pointer to value used to store Bluetooth authentication passkey.
+ * @param[out] bt_auth_passkey	Pointer to value used to store Bluetooth authentication passkey.
  *
  * @return 0 If the operation was successful. Otherwise, a (negative) error code is returned.
  */

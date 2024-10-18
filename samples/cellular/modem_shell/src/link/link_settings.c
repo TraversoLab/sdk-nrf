@@ -278,7 +278,7 @@ int link_sett_save_defcont_pdn_family(enum pdn_fam family)
 {
 	int err;
 	const char *key = LINK_SETT_KEY "/" LINK_SETT_DEFCONT_IP_FAMILY_KEY;
-	char tmp_str[8];
+	char tmp_str[16];
 
 	err = settings_save_one(key, &family, sizeof(enum pdn_fam));
 
@@ -801,12 +801,12 @@ void link_sett_defaults_set(void)
 	mosh_print("link settings reseted");
 }
 
-void link_sett_modem_factory_reset(enum lte_lc_factory_reset_type type)
+void link_sett_modem_factory_reset(enum link_factory_reset_type type)
 {
 	int err;
 
 	/* Reset modem factory settings by type */
-	err = lte_lc_factory_reset(type);
+	err = nrf_modem_at_printf("AT%%XFACTORYRESET=%d", type);
 	if (err) {
 		mosh_error("Resetting modem factory settings failed, err %d", err);
 	} else {

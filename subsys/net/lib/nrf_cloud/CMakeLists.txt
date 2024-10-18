@@ -9,7 +9,9 @@ zephyr_library_sources(
 	src/nrf_cloud_log.c
 	src/nrf_cloud_codec.c
 	src/nrf_cloud_mem.c
-	src/nrf_cloud_client_id.c)
+	src/nrf_cloud_client_id.c
+	src/nrf_cloud_sec_tag.c
+	src/nrf_cloud_info.c)
 zephyr_library_sources_ifdef(
 	CONFIG_NRF_CLOUD_ALERT
 	src/nrf_cloud_alert.c)
@@ -26,7 +28,8 @@ zephyr_library_sources_ifdef(
 	CONFIG_NRF_CLOUD_MQTT
 	src/nrf_cloud.c
 	src/nrf_cloud_fsm.c
-	src/nrf_cloud_transport.c)
+	src/nrf_cloud_transport.c
+	src/nrf_cloud_dns.c)
 zephyr_library_sources_ifdef(
 	CONFIG_NRF_CLOUD_AGNSS
 	src/nrf_cloud_agnss.c
@@ -67,7 +70,8 @@ zephyr_library_sources_ifdef(
 	coap/src/msg_encode.c
 	coap/src/nrf_cloud_coap.c
 	coap/src/pgps_decode.c
-	coap/src/pgps_encode.c)
+	coap/src/pgps_encode.c
+	src/nrf_cloud_dns.c)
 zephyr_library_sources_ifdef(
 	CONFIG_NRF_CLOUD_CHECK_CREDENTIALS
 	src/nrf_cloud_credentials.c)

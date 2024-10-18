@@ -8,6 +8,7 @@
 #define NRF_CLOUD_TRANSPORT_H__
 
 #include <stddef.h>
+#include <zephyr/net/mqtt.h>
 #include <net/nrf_cloud.h>
 
 #ifdef __cplusplus
@@ -30,13 +31,18 @@ enum nct_evt_type {
 };
 
 enum nct_cc_opcode {
-	/* State (shadow) request */
-	NCT_CC_OPCODE_GET_REQ,
-	/* Shadow update: accepted (trimmed) */
-	NCT_CC_OPCODE_UPDATE_ACCEPTED,
-	/* Shadow update: rejected */
+	/* NOTE: Explicitly enumerated values are used as an array index */
+	/* State (shadow) request - TX */
+	NCT_CC_OPCODE_GET_REQ = 0,
+	/* Shadow update: accepted (trimmed) - RX/TX */
+	NCT_CC_OPCODE_UPDATE_ACCEPTED = 1,
+#if defined(CONFIG_NRF_CLOUD_MQTT_SHADOW_TRANSFORMS)
+	/* Shadow transform - RX/TX */
+	NCT_CC_OPCODE_TRANSFORM = 2,
+#endif
+	/* Shadow update: rejected - RX */
 	NCT_CC_OPCODE_UPDATE_REJECTED,
-	/* Shadow update: delta */
+	/* Shadow update: delta - RX */
 	NCT_CC_OPCODE_UPDATE_DELTA,
 };
 
@@ -64,10 +70,54 @@ struct nct_evt {
 	enum nct_evt_type type;
 };
 
+enum cc_ep_type {
+	/* Subscribe topics */
+	CC_RX_ACCEPT,
+	CC_RX_REJECT,
+	CC_RX_DELTA,
+	/* Publish topics */
+	CC_TX_UPDATE,
+	CC_TX_GET,
+
+#if defined(CONFIG_NRF_CLOUD_MQTT_SHADOW_TRANSFORMS)
+	/* Shadow transform: subscribe */
+	CC_RX_ACCEPT_TF,
+	/* Shadow transform: publish */
+	CC_TX_GET_TF,
+#endif
+
+	CC__COUNT
+};
+
+/* The "control channel" MQTT topics */
+struct nct_cc_endpoints {
+	/* Array of MQTT topics indexed by @ref cc_ep_type */
+	struct mqtt_utf8 e[CC__COUNT];
+};
+
+enum dc_ep_type {
+	/* Topic prefix */
+	DC_BASE,
+	/* Subscribe topics */
+	DC_RX,
+	/* Publish topics */
+	DC_TX,
+	DC_BULK,
+	DC_BIN,
+
+	DC__COUNT
+};
+
+/* The "device channel" MQTT topics */
+struct nct_dc_endpoints {
+	/* Array of MQTT topics indexed by @ref dc_ep_type */
+	struct mqtt_utf8 e[DC__COUNT];
+};
+
 int nct_socket_get(void);
 
 /** @brief Initialization routine for the transport. */
-int nct_initialize(const char * const client_id);
+int nct_initialize(const struct nrf_cloud_init_param *param);
 
 /** @brief Unintialize the transport; reset state and free allocated memory */
 void nct_uninit(void);
@@ -129,20 +179,12 @@ int nct_disconnect(void);
  *
  * @note This routine must be called before @ref nrf_dc_connect.
  */
-void nct_dc_endpoint_set(const struct nrf_cloud_data *tx_endpoint,
-			 const struct nrf_cloud_data *rx_endpoint,
-			 const struct nrf_cloud_data *bulk_endpoint,
-			 const struct nrf_cloud_data *bin_endpoint,
-			 const struct nrf_cloud_data *m_endpoint);
+void nct_dc_endpoint_set(const struct nct_dc_endpoints *const eps);
 
 /**
  * @brief Get the endpoint information.
  */
-void nct_dc_endpoint_get(struct nrf_cloud_data *tx_endpoint,
-			 struct nrf_cloud_data *rx_endpoint,
-			 struct nrf_cloud_data *bulk_endpoint,
-			 struct nrf_cloud_data *bin_endpoint,
-			 struct nrf_cloud_data *m_endpoint);
+void nct_dc_endpoint_get(struct nct_dc_endpoints *const eps);
 
 /** @brief Needed for keep alive. */
 int nct_process(void);
@@ -183,6 +225,9 @@ int nct_stage_get(char *cur_stage, const int cur_stage_len);
 
 /** @brief Troubleshooting function to query the current nrfcloud tenant ID. */
 int nct_tenant_id_get(char *cur_tenant, const int cur_tenant_len);
+
+/** @brief Ping the MQTT connection and change the keepalive value. */
+int nct_set_keepalive(int seconds);
 
 #ifdef __cplusplus
 }

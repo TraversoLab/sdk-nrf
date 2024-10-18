@@ -30,6 +30,7 @@ LOG_MODULE_REGISTER(slm_cmux, CONFIG_SLM_LOG_LEVEL);
 static struct {
 	/* UART backend */
 	struct modem_pipe *uart_pipe;
+	bool uart_pipe_open;
 	struct modem_backend_uart uart_backend;
 	uint8_t uart_backend_receive_buf[RECV_BUF_LEN];
 	uint8_t uart_backend_transmit_buf[TRANSMIT_BUF_LEN];
@@ -138,17 +139,19 @@ static void close_pipe(struct modem_pipe **pipe)
 
 static int cmux_stop(void)
 {
-	if (cmux.uart_pipe && cmux.uart_pipe->state == MODEM_PIPE_STATE_OPEN) {
+	if (cmux.uart_pipe && cmux.uart_pipe_open) {
 		/* CMUX is running. Just close the UART pipe to pause and be able to resume.
 		 * This allows AT data to be cached by the CMUX module while the UART is off.
 		 */
 		modem_pipe_close_async(cmux.uart_pipe);
+		cmux.uart_pipe_open = false;
 		return 0;
 	}
 
 	modem_cmux_release(&cmux.instance);
 
 	close_pipe(&cmux.uart_pipe);
+	cmux.uart_pipe_open = false;
 
 	for (size_t i = 0; i != ARRAY_SIZE(cmux.dlcis); ++i) {
 		close_pipe(&cmux.dlcis[i].pipe);
@@ -209,7 +212,7 @@ void slm_cmux_release(enum cmux_channel channel)
 {
 	struct cmux_dlci *dlci = cmux_get_dlci(channel);
 
-#if defined(SLM_CMUX_AUTOMATIC_FALLBACK_ON_PPP_STOPPAGE)
+#if defined(CONFIG_SLM_CMUX_AUTOMATIC_FALLBACK_ON_PPP_STOPPAGE)
 	if (channel == CMUX_PPP_CHANNEL) {
 		cmux.at_channel = 0;
 	}
@@ -222,8 +225,9 @@ static int cmux_start(void)
 	int ret;
 
 	if (cmux_is_started()) {
-		ret = modem_pipe_open(cmux.uart_pipe);
+		ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SLM_MODEM_PIPE_TIMEOUT));
 		if (!ret) {
+			cmux.uart_pipe_open = true;
 			LOG_INF("CMUX resumed.");
 		}
 		return ret;
@@ -249,7 +253,10 @@ static int cmux_start(void)
 		return ret;
 	}
 
-	ret = modem_pipe_open(cmux.uart_pipe);
+	ret = modem_pipe_open(cmux.uart_pipe, K_SECONDS(CONFIG_SLM_MODEM_PIPE_TIMEOUT));
+	if (!ret) {
+		cmux.uart_pipe_open = true;
+	}
 	return ret;
 }
 
@@ -269,18 +276,18 @@ static void cmux_starter(struct k_work *)
 }
 
 SLM_AT_CMD_CUSTOM(xcmux, "AT#XCMUX", handle_at_cmux);
-static int handle_at_cmux(enum at_cmd_type cmd_type, const struct at_param_list *param_list,
+static int handle_at_cmux(enum at_parser_cmd_type cmd_type, struct at_parser *parser,
 			  uint32_t param_count)
 {
 	static struct k_work_delayable cmux_start_work;
 	unsigned int at_dlci;
 	int ret;
 
-	if (cmd_type == AT_CMD_TYPE_READ_COMMAND) {
+	if (cmd_type == AT_PARSER_CMD_TYPE_READ) {
 		rsp_send("\r\n#XCMUX: %u,%u\r\n", cmux.at_channel + 1, CHANNEL_COUNT);
 		return 0;
 	}
-	if (cmd_type != AT_CMD_TYPE_SET_COMMAND || param_count > 2) {
+	if (cmd_type != AT_PARSER_CMD_TYPE_SET || param_count > 2) {
 		return -EINVAL;
 	}
 
@@ -289,15 +296,15 @@ static int handle_at_cmux(enum at_cmd_type cmd_type, const struct at_param_list 
 	}
 
 	if (param_count == 2) {
-		ret = at_params_unsigned_int_get(param_list, 1, &at_dlci);
+		ret = at_parser_num_get(parser, 1, &at_dlci);
 		if (ret || (at_dlci != 1 && (!IS_ENABLED(CONFIG_SLM_PPP) || at_dlci != 2))) {
 			return -EINVAL;
 		}
 		const unsigned int at_channel = at_dlci - 1;
 
 #if defined(CONFIG_SLM_PPP)
-		if (slm_ppp_is_running() && at_channel != cmux.at_channel) {
-			/* The AT channel cannot be changed when PPP is running. */
+		if (!slm_ppp_is_stopped() && at_channel != cmux.at_channel) {
+			/* The AT channel cannot be changed when PPP has a channel reserved. */
 			return -ENOTSUP;
 		}
 #endif

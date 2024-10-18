@@ -12,9 +12,19 @@ menuconfig BT_FAST_PAIR
 
 if BT_FAST_PAIR
 
+rsource "use_case/Kconfig"
+
+config BT_FAST_PAIR_SUBSEQUENT_PAIRING
+	bool "Fast Pair subsequent pairing [EXPERIMENTAL]"
+	select EXPERIMENTAL
+	help
+	  Enable support for the subsequent pairing feature. Subsequent pairing
+	  refers to the procedure between a Fast Pair Provider, initially paired
+	  with your Google account, and another Fast Pair Seeker logged into the
+	  same account.
+
 config BT_FAST_PAIR_REQ_PAIRING
 	bool "Require Bluetooth Pairing during Fast Pair Procedure"
-	default y
 	help
 	  Require the Bluetooth Pairing during the Fast Pair Procedure.
 	  With this option enabled, the Fast Pair modules rejects the Fast Pair
@@ -22,33 +32,22 @@ config BT_FAST_PAIR_REQ_PAIRING
 
 config BT_FAST_PAIR_PN
 	bool "Fast Pair Personalized Name extension [EXPERIMENTAL]"
-	default y if !BT_FAST_PAIR_FMDN
 	select BT_FAST_PAIR_GATT_SERVICE_ADDITIONAL_DATA
 	select BT_FAST_PAIR_STORAGE_PN
 	select EXPERIMENTAL
 	help
 	  Enable Fast Pair Personalized Name extension.
 
+config BT_FAST_PAIR_BN
+	bool "Fast Pair Battery Notification extension [EXPERIMENTAL]"
+	select BT_FAST_PAIR_BATTERY
+	select EXPERIMENTAL
+	help
+	  Enable Fast Pair Battery Notification extension.
+
 rsource "fp_crypto/Kconfig.fp_crypto"
 rsource "fp_storage/Kconfig.fp_storage"
 rsource "fmdn/Kconfig"
-
-if !BT_FAST_PAIR_FMDN
-
-config BT_DIS
-	default y
-
-config BT_DIS_FW_REV
-	default y
-	help
-	  Firmware revision characteristic is required by the Fast Pair specification. Enable it
-	  by default if Fast Pair Service is enabled to simplify configuration.
-
-config BT_DIS_FW_REV_STR
-	default MCUBOOT_IMGTOOL_SIGN_VERSION if BOOTLOADER_MCUBOOT
-	default "0.0.0+0"
-
-endif # !BT_FAST_PAIR_FMDN
 
 config BT_FAST_PAIR_ACTIVATION
 	bool
@@ -90,6 +89,17 @@ config BT_FAST_PAIR_GATT_SERVICE
 
 if BT_FAST_PAIR_GATT_SERVICE
 
+config BT_FAST_PAIR_GATT_SERVICE_MODEL_ID
+	bool "Fast Pair Service's Model ID GATT characteristic"
+	help
+	  Add Fast Pair Service's Model ID GATT characteristic.
+
+config BT_FAST_PAIR_GATT_SERVICE_ADDITIONAL_DATA
+	bool
+	help
+	  Add Fast Pair Service's Additional Data GATT characteristic.
+
+# Override of the Bluetooth configuration defaults for the Google Fast Pair GATT service.
 config BT_GATT_AUTO_SEC_REQ
 	default n
 	help
@@ -116,17 +126,6 @@ config BT_CTLR_DATA_LENGTH_MAX
 	help
 	  If Fast Pair is enabled, use MTU value of 83 (recommended by the specification).
 
-config BT_FAST_PAIR_GATT_SERVICE_MODEL_ID
-	bool "Fast Pair Service's Model ID GATT characteristic"
-	default y if !BT_FAST_PAIR_FMDN
-	help
-	  Add Fast Pair Service's Model ID GATT characteristic.
-
-config BT_FAST_PAIR_GATT_SERVICE_ADDITIONAL_DATA
-	bool
-	help
-	  Add Fast Pair Service's Additional Data GATT characteristic.
-
 endif # BT_FAST_PAIR_GATT_SERVICE
 
 config BT_FAST_PAIR_REGISTRATION_DATA
@@ -141,16 +140,17 @@ if BT_FAST_PAIR_REGISTRATION_DATA
 config BT_FAST_PAIR_REGISTRATION_DATA_INIT_PRIORITY
 	int
 	range 0 9
-	default 3
+	default 0
 	help
 	  Fast Pair registration data module initialization priority.
 	  Used when registering initialization function to Fast Pair activation module.
+	  This module should be initialized before all other Fast Pair modules to avoid using
+	  Fast Pair subsystem when the Fast Pair provisioning data is not configured properly.
 
 endif # BT_FAST_PAIR_REGISTRATION_DATA
 
 config BT_FAST_PAIR_BATTERY
 	bool
-	default y
 	help
 	  Add Fast Pair battery module source files.
 
@@ -171,6 +171,22 @@ config BT_FAST_PAIR_STORAGE_INTEGRATION_INIT_PRIORITY
 	  Used when registering to Fast Pair activation module.
 
 endif # BT_FAST_PAIR_STORAGE_INTEGRATION
+
+config BT_FAST_PAIR_BOND_MANAGER
+	bool "Fast Pair bond management functionality [EXPERIMENTAL]"
+	select EXPERIMENTAL
+	select BT_FAST_PAIR_STORAGE_AK_BOND
+	help
+	  If this option is enabled, the Fast Pair subsystem tracks the Bluetooth bonds created
+	  through the Fast Pair Procedure and unpairs them if the Fast Pair Procedure is incomplete
+	  or the Account Key associated with the bonds is removed. It also unpairs the Fast Pair
+	  Bluetooth bonds on Fast Pair factory reset. Keep in mind that when the Fast Pair subsystem
+	  is disabled, the Bluetooth bonds are not tracked. Do not perform operations on the Fast
+	  Pair Bluetooth bonds apart from the Fast Pair factory reset when the Fast Pair subsystem
+	  is disabled. When this option is enabled, non-volatile storage is used to store the bond
+	  information. You can enable this option during DFU, but you cannot disable it during DFU
+	  if you used it earlier unless you erase whole Fast Pair non-volatile storage. Otherwise,
+	  the Fast Pair enable operation will fail.
 
 module = BT_FAST_PAIR
 module-str = Fast Pair Service

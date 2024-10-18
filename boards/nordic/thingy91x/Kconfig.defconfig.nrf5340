@@ -3,7 +3,7 @@
 # Copyright (c) 2024 Nordic Semiconductor
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-if  BOARD_THINGY91X_NRF5340_CPUAPP || BOARD_THINGY91X_NRF5340_CPUAPP_NS
+if BOARD_THINGY91X_NRF5340_CPUAPP || BOARD_THINGY91X_NRF5340_CPUAPP_NS
 
 # By default, if we build for a Non-Secure version of the board,
 # enable building with TF-M as the Secure Execution Environment.
@@ -48,6 +48,9 @@ endif # BUILD_WITH_TFM
 DT_CHOSEN_Z_CODE_PARTITION := zephyr,code-partition
 DT_CHOSEN_Z_SRAM_PARTITION := zephyr,sram-secure-partition
 
+config NFCT_PINS_AS_GPIOS
+	default y
+
 if BOARD_THINGY91X_NRF5340_CPUAPP && TRUSTED_EXECUTION_SECURE
 
 config FLASH_LOAD_SIZE
@@ -63,10 +66,6 @@ config FLASH_LOAD_OFFSET
 
 config FLASH_LOAD_SIZE
 	default $(dt_chosen_reg_size_hex,$(DT_CHOSEN_Z_CODE_PARTITION))
-
-choice BT_HCI_BUS_TYPE
-	default BT_HCI_IPC if BT
-endchoice
 
 config HEAP_MEM_POOL_SIZE
 	default 4096 if BT_HCI_IPC
@@ -84,9 +83,6 @@ config BT_CTLR
 endif # BOARD_THINGY91X_NRF5340_CPUNET
 
 config USE_SEGGER_RTT
-	default y if BOARD_THINGY91X_NRF5340_CPUAPP || BOARD_THINGY91X_NRF5340_CPUAPP_NS || BOARD_THINGY91X_NRF5340_CPUNET
-
-config RTT_CONSOLE
 	default y if BOARD_THINGY91X_NRF5340_CPUAPP || BOARD_THINGY91X_NRF5340_CPUAPP_NS || BOARD_THINGY91X_NRF5340_CPUNET
 
 if !IS_BOOTLOADER_IMG

@@ -10,16 +10,24 @@
 #include <nrf_modem.h>
 #include <nrf_modem_os.h>
 #include <nrf.h>
-#include <nrfx_ipc.h>
 #include <nrf_errno.h>
 #include <errno.h>
-#include <pm_config.h>
+
 #include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(nrf_modem, CONFIG_NRF_MODEM_LIB_LOG_LEVEL);
+
+#if CONFIG_SOC_SERIES_NRF91X
+#include <pm_config.h>
+#define SHMEM_TX_HEAP_ADDR (PM_NRF_MODEM_LIB_TX_ADDRESS)
+#define SHMEM_TX_HEAP_SIZE (CONFIG_NRF_MODEM_LIB_SHMEM_TX_SIZE)
+#elif CONFIG_SOC_SERIES_NRF92X
+#define SHMEM_TX_HEAP_ADDR (DT_REG_ADDR(DT_NODELABEL(cpuapp_cpucell_ipc_shm_heap)))
+#define SHMEM_TX_HEAP_SIZE (DT_REG_SIZE(DT_NODELABEL(cpuapp_cpucell_ipc_shm_heap)))
+#endif
+
 
 #define UNUSED_FLAGS 0
 #define THREAD_MONITOR_ENTRIES 10
-
-LOG_MODULE_REGISTER(nrf_modem, CONFIG_NRF_MODEM_LIB_LOG_LEVEL);
 
 struct sleeping_thread {
 	sys_snode_t node;
@@ -376,7 +384,14 @@ void nrf_modem_os_free(void *mem)
 void *nrf_modem_os_shm_tx_alloc(size_t bytes)
 {
 	extern uint32_t nrf_modem_lib_shmem_failed_allocs;
+
+#if (CONFIG_SOC_SERIES_NRF92X && CONFIG_DCACHE)
+	/* Allocate cache line aligned memory. */
+	void * const addr = k_heap_aligned_alloc(&nrf_modem_lib_shmem_heap, CONFIG_DCACHE_LINE_SIZE,
+				    ROUND_UP(bytes, CONFIG_DCACHE_LINE_SIZE), K_NO_WAIT);
+#else
 	void * const addr = k_heap_alloc(&nrf_modem_lib_shmem_heap, bytes, K_NO_WAIT);
+#endif
 
 	if (IS_ENABLED(CONFIG_NRF_MODEM_LIB_MEM_DIAG_ALLOC) && !addr) {
 		nrf_modem_lib_shmem_failed_allocs++;
@@ -435,7 +450,7 @@ void nrf_modem_os_log(int level, const char *fmt, ...)
 			source = (void *)__log_current_const_data;
 		}
 
-		z_log_msg_runtime_vcreate(CONFIG_LOG_DOMAIN_ID, source, level,
+		z_log_msg_runtime_vcreate(Z_LOG_LOCAL_DOMAIN_ID, source, level,
 					  NULL, 0, 0, fmt, ap);
 #endif /* CONFIG_LOG_MODE_MINIMAL */
 
@@ -461,7 +476,7 @@ void nrf_modem_os_logdump(int level, const char *str, const void *data, size_t l
 			source = (void *)__log_current_const_data;
 		}
 
-		z_log_msg_runtime_vcreate(CONFIG_LOG_DOMAIN_ID, source, level,
+		z_log_msg_runtime_vcreate(Z_LOG_LOCAL_DOMAIN_ID, source, level,
 					  data, len, 0, str, (va_list) { 0 });
 #endif /* CONFIG_LOG_MODE_MINIMAL */
 
@@ -488,8 +503,7 @@ void nrf_modem_os_init(void)
 {
 	/* Initialize heaps */
 	k_heap_init(&nrf_modem_lib_heap, library_heap_buf, sizeof(library_heap_buf));
-	k_heap_init(&nrf_modem_lib_shmem_heap, (void *)PM_NRF_MODEM_LIB_TX_ADDRESS,
-		    CONFIG_NRF_MODEM_LIB_SHMEM_TX_SIZE);
+	k_heap_init(&nrf_modem_lib_shmem_heap, (void *)SHMEM_TX_HEAP_ADDR, SHMEM_TX_HEAP_SIZE);
 }
 
 void nrf_modem_os_shutdown(void)

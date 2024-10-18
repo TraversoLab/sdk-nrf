@@ -275,25 +275,29 @@ suit_plat_err_t suit_storage_installed_envelope_get(const suit_manifest_class_id
 	suit_plat_err_t err = suit_storage_mpi_role_get(id, &role);
 
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find role for given class ID.");
+		LOG_WRN("Unable to find role for given class ID.");
 		return err;
 	}
 
 	err = find_manifest_area(role, addr, size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find area for envelope with role 0x%x.", role);
+		LOG_ERR("Unable to find area for envelope with role 0x%x%s.", role,
+			suit_role_name_get(role));
 		return err;
 	}
 
-	LOG_DBG("Decode envelope with role: 0x%x address: 0x%lx", role, (intptr_t)(*addr));
+	LOG_DBG("Decode envelope with role: 0x%x%s address: 0x%lx", role, suit_role_name_get(role),
+		(intptr_t)(*addr));
 
 	err = suit_storage_envelope_get(*addr, *size, id, addr, size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_WRN("Unable to parse envelope with role 0x%x", role);
+		LOG_WRN("Unable to parse envelope with role 0x%x%s", role,
+			suit_role_name_get(role));
 		return err;
 	}
 
-	LOG_DBG("Valid envelope with given class ID and role 0x%x found", role);
+	LOG_DBG("Valid envelope with given class ID and role 0x%x%s found", role,
+		suit_role_name_get(role));
 
 	return err;
 }
@@ -308,7 +312,7 @@ suit_plat_err_t suit_storage_install_envelope(const suit_manifest_class_id_t *id
 
 	err = suit_storage_mpi_role_get(id, &role);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find role for given class ID.");
+		LOG_WRN("Unable to find role for given class ID.");
 		return err;
 	}
 
@@ -318,17 +322,19 @@ suit_plat_err_t suit_storage_install_envelope(const suit_manifest_class_id_t *id
 
 	err = find_manifest_area(role, (const uint8_t **)&area_addr, &area_size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find area for envelope with role 0x%x.", role);
+		LOG_ERR("Unable to find area for envelope with role 0x%x%s.", role,
+			suit_role_name_get(role));
 		return err;
 	}
 
 	err = suit_storage_envelope_install(area_addr, area_size, id, addr, size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Failed to install envelope with role 0x%x.", role);
+		LOG_ERR("Failed to install envelope with role 0x%x%s.", role,
+			suit_role_name_get(role));
 		return err;
 	}
 
-	LOG_INF("Envelope with role 0x%x saved.", role);
+	LOG_INF("Envelope with role 0x%x%s saved.", role, suit_role_name_get(role));
 
 	return err;
 }
@@ -341,7 +347,7 @@ suit_plat_err_t suit_storage_report_clear(size_t index)
 
 	err = find_report_area(index, &area_addr, &area_size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find report area at index %d.", index);
+		LOG_WRN("Unable to find report area at index %d.", index);
 		return err;
 	}
 
@@ -356,7 +362,7 @@ suit_plat_err_t suit_storage_report_save(size_t index, const uint8_t *buf, size_
 
 	err = find_report_area(index, &area_addr, &area_size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find area for report at index %d.", index);
+		LOG_WRN("Unable to find area for report at index %d.", index);
 		return err;
 	}
 
@@ -371,9 +377,78 @@ suit_plat_err_t suit_storage_report_read(size_t index, const uint8_t **buf, size
 
 	err = find_report_area(index, &area_addr, &area_size);
 	if (err != SUIT_PLAT_SUCCESS) {
-		LOG_INF("Unable to find area with report at index %d.", index);
+		LOG_WRN("Unable to find area with report at index %d.", index);
 		return err;
 	}
 
 	return suit_storage_report_internal_read(area_addr, area_size, buf, len);
+}
+
+suit_plat_err_t suit_storage_purge(suit_manifest_domain_t domain)
+{
+	struct suit_storage *storage = (struct suit_storage *)SUIT_STORAGE_ADDRESS;
+	uint8_t *update_addr = storage->update.erase_block;
+	size_t update_size = sizeof(storage->update.erase_block);
+	const struct device *fdev = SUIT_PLAT_INTERNAL_NVM_DEV;
+	suit_plat_err_t ret = SUIT_PLAT_SUCCESS;
+	suit_manifest_role_t roles[] = {
+		SUIT_MANIFEST_APP_ROOT,
+		SUIT_MANIFEST_APP_LOCAL_1,
+		SUIT_MANIFEST_APP_RECOVERY,
+	};
+	int err = 0;
+	const uint8_t *addr = NULL;
+	size_t size = 0;
+
+	if (!device_is_ready(fdev)) {
+		return SUIT_PLAT_ERR_HW_NOT_READY;
+	}
+
+	switch (domain) {
+	case SUIT_MANIFEST_DOMAIN_APP:
+		for (size_t i = 0; i < ARRAY_SIZE(roles); i++) {
+			ret = find_manifest_area(roles[i], &addr, &size);
+			if (ret != SUIT_PLAT_SUCCESS) {
+				LOG_ERR("Unable to find area for envelope with role 0x%x%s.",
+					roles[i], suit_role_name_get(roles[i]));
+				continue;
+			}
+
+			/* Clear regular entry. */
+			err = flash_erase(fdev, suit_plat_mem_nvm_offset_get((uint8_t *)addr),
+					  size);
+			if (err != 0) {
+				break;
+			}
+		}
+
+		/* Clear update candidate info. */
+		if (err == 0) {
+			err = flash_erase(fdev, suit_plat_mem_nvm_offset_get(update_addr),
+					  update_size);
+		}
+
+		/* Clear reports. */
+		for (size_t i = 0; i < SUIT_N_REPORTS; i++) {
+			if (ret == SUIT_PLAT_SUCCESS) {
+				ret = suit_storage_report_clear(i);
+			}
+		}
+		break;
+	default:
+		return SUIT_PLAT_ERR_INVAL;
+	}
+
+	/* Reinitialize SUIT storage internal structures.
+	 * Ignore return code as an init failure on erased SUIT storage area
+	 * does not indicate that the purge failed.
+	 */
+	(void)suit_storage_init();
+
+	/* In case of IO error, ignore the suit processor return code. */
+	if (err != 0) {
+		return SUIT_PLAT_ERR_IO;
+	}
+
+	return ret;
 }

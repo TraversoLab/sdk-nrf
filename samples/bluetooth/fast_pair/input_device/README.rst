@@ -12,9 +12,11 @@ This sample demonstrates :ref:`how to use Google Fast Pair with the nRF Connect 
 Google Fast Pair Service (GFPS) is a standard for pairing Bluetooth® and Bluetooth LE devices with as little user interaction required as possible.
 Google also provides additional features built upon the Fast Pair standard.
 For detailed information about supported functionalities, see the official `Fast Pair`_ documentation.
+The software maturity level for the input device use case is outlined in the :ref:`software_maturity_fast_pair_use_case` table.
 
 .. note::
-   The software maturity level for the input device use case is listed in the :ref:`software_maturity_fast_pair_use_case` table.
+   Support for Fast Pair input device use case is also integrated into :ref:`nrf_desktop`.
+   The nRF Desktop is a complete reference application design of :term:`Human Interface Device (HID)`.
 
 Requirements
 ************
@@ -484,7 +486,9 @@ Fast Pair GATT Service
 This sample uses the :ref:`bt_fast_pair_readme` and its dependencies and is configured to meet the requirements of the Fast Pair standard.
 See :ref:`ug_bt_fast_pair` for details about integrating Fast Pair in the |NCS|.
 
-The :ref:`bt_fast_pair_provision_script` is used by the build system to automatically generate the hexadecimal file that contains Fast Pair Model ID and Anti Spoofing Private Key.
+This sample enables the ``SB_CONFIG_BT_FAST_PAIR`` Kconfig option.
+With this option enabled, the build system calls the :ref:`bt_fast_pair_provision_script`, which automatically generates a hexadecimal file containing Fast Pair Model ID and Anti Spoofing Private Key.
+For more details about enabling Fast Pair for your application, see the :ref:`ug_bt_fast_pair_prerequisite_ops_kconfig` section in the Fast Pair integration guide.
 
 Bluetooth LE advertising data providers
 =======================================

@@ -13,10 +13,17 @@ jobs:
         with:
           git-fetch-depth: 0
           path: workspace/nrf
+          west-update-args: '--group-filter=+babblesim,+sidewalk'
 
-      - name: Create tar
-        run: >
-          tar -C ./workspace -cvf src.tar.gz .
+      - name: Configure git and run garbage collection
+        run: |
+          cd workspace/nrf
+          git config --global pack.windowMemory "32m" &&
+          west forall -c 'git gc --prune --aggressive'
+
+      - name: Create tar archive
+        run: |
+          tar -C ./workspace -czvf src.tar.gz .
 
       - name: Set up JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4

@@ -47,6 +47,16 @@ config DESKTOP_USB_PM_ENABLE
 	help
 	  This enables small module that blocks power down if the USB is active.
 
+config DESKTOP_USB_HID_REPORT_SENT_ON_SOF
+	bool "Submit HID report sent event on USB Start of Frame (SOF) [EXPERIMENTAL]"
+	select EXPERIMENTAL
+	help
+	  Delay submitting hid_report_sent_event until subsequent USB Start of
+	  Frame (SOF). The feature reduces the negative impact of jitter related
+	  to USB polls. However, it also increases HID data latency, as a HID
+	  report pipeline with two sequential reports is required to ensure that
+	  the USB peripheral can provide a HID report on every USB poll.
+
 config DESKTOP_USB_INIT_THREAD
 	bool
 	default y if SOC_SERIES_NRF54HX
@@ -86,14 +96,22 @@ config DESKTOP_USB_STACK_NEXT
 	bool "USB next stack [EXPERIMENTAL]"
 	select EXPERIMENTAL
 	select USB_DEVICE_STACK_NEXT
+	imply SOC_FLASH_NRF_PARTIAL_ERASE
 	help
 	  Use experimental integration of USB next stack.
+
+	  The option implies partial erase of nRF SoC flash in the driver
+	  configuration to improve stability of the USB next stack. The partial
+	  erase feature works around device errors that might be reported by
+	  Windows USB host in Device Manager if USB cable is connected while
+	  erasing secondary image slot in background.
 
 config DESKTOP_USB_STACK_LEGACY
 	bool "USB legacy stack"
 	select USB_DEVICE_STACK
 	select USB_DEVICE_HID
 	select USB_DEVICE_REMOTE_WAKEUP if DESKTOP_USB_REMOTE_WAKEUP
+	select USB_DEVICE_SOF if DESKTOP_USB_HID_REPORT_SENT_ON_SOF
 
 endchoice
 
@@ -173,10 +191,17 @@ endif # DESKTOP_USB_STACK_LEGACY
 if DESKTOP_USB_STACK_NEXT
 
 config USBD_HID_IN_BUF_COUNT
+	default 2 if DESKTOP_USB_HID_REPORT_SENT_ON_SOF
 	default 1
 	help
-	  nRF Desktop queues HID reports at the source. There is no need to use
-	  multiple buffers in the IN pool per HID instance.
+	  nRF Desktop queues HID reports at the source. Generally there is no
+	  need to use multiple buffers in the IN pool per HID instance.
+
+	  An exception is use-case where HID reports are submitted from USB sent
+	  callback (when synchronizing hid_report_sent to USB Start of Frame
+	  (SOF) enforces using pipeline size of 2). An extra buffer must be
+	  allocated to allow providing data to the USB next stack before the
+	  previously allocated buffer is freed.
 
 config DESKTOP_USB_STACK_NEXT_DISABLE_ON_VBUS_REMOVAL
 	bool

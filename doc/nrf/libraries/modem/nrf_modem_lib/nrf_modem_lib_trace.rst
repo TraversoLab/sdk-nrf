@@ -7,14 +7,17 @@ Modem trace module
    :local:
    :depth: 2
 
-To enable the tracing functionality, enable the :kconfig:option:`CONFIG_NRF_MODEM_LIB_TRACE` Kconfig in your project configuration.
 The module is implemented in :file:`nrf/lib/nrf_modem_lib/nrf_modem_lib_trace.c` and consists of a thread that initializes, deinitializes, and forwards modem traces to a backend.
 The trace backend can be selected in one of the following ways:
 
 * Adding the ``nrf91-modem-trace-uart`` snippet to send modem traces over UART.
   See :ref:`nrf91_modem_trace_uart_snippet` for more details.
-* Enabling the :kconfig:option:`CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_RTT` Kconfig option to send modem traces over SEGGER RTT.
-* Enabling the :kconfig:option:`CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_FLASH` Kconfig option to write modem traces to external flash.
+* Adding the ``nrf91-modem-trace-rtt`` snippet to send modem traces over RTT.
+  See :ref:`nrf91_modem_trace_rtt_snippet` for more details.
+* Adding the ``nrf91-modem-trace-ext-flash`` snippet to store modem traces in external flash.
+  See :ref:`nrf91_modem_trace_ext_flash_snippet` for more details.
+* Adding the ``nrf91-modem-trace-ram`` snippet to store modem traces in RAM.
+  See :ref:`nrf91_modem_trace_ram_snippet` for more details.
 
 To reduce the amount of trace data sent from the modem, a different trace level can be selected.
 Complete the following steps to configure the modem trace level at compile time:
@@ -82,7 +85,7 @@ The modem trace flash backend has some additional configuration options:
 * :kconfig:option:`CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_FLASH_PARTITION_SIZE` - Defines the space to be used for the modem trace partition.
   In order to improve the modem trace write performance, this partition is erased during system boot.
   This might lead to a significant increase in the boot time on the nRF9160 DK.
-  The external flash size on the nRF9160 DK is 8 MB (equal to ``0x800000`` in HEX) and 32 MB on the nRF9161 DK (equal to ``0x2000000`` in HEX).
+  The external flash size on the nRF9160 DK is 8 MB (equal to ``0x800000`` in HEX) and 32 MB on an nRF91x1 DK (equal to ``0x2000000`` in HEX).
 
 It is also recommended to enable high drive mode and high-performance mode in devicetree.
 High drive is to ensure that the communication with the flash device is reliable at high speed.

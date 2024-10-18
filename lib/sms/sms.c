@@ -16,6 +16,7 @@
 #include <modem/lte_lc.h>
 #endif
 #include <modem/sms.h>
+#include <modem/nrf_modem_lib.h>
 
 #include "sms_submit.h"
 #include "sms_deliver.h"
@@ -25,14 +26,24 @@ LOG_MODULE_REGISTER(sms, CONFIG_SMS_LOG_LEVEL);
 
 /** @brief AT command to check if a client already exist. */
 #define AT_SMS_SUBSCRIBER_READ "AT+CNMI?"
-/** @brief AT command to register an SMS client. */
+/**
+ * @brief AT command to register an SMS client. Value depends on
+ * whether status reports are required or not.
+ */
+#if defined(CONFIG_SMS_STATUS_REPORT)
 #define AT_SMS_SUBSCRIBER_REGISTER "AT+CNMI=3,2,0,1"
+#else
+#define AT_SMS_SUBSCRIBER_REGISTER "AT+CNMI=3,2,0,0"
+#endif
 /** @brief AT command to unregister an SMS client. */
 #define AT_SMS_SUBSCRIBER_UNREGISTER "AT+CNMI=0,0,0,0"
 /** @brief AT command to an ACK in PDU mode. */
 #define AT_SMS_PDU_ACK "AT+CNMA=1"
 /** @brief AT notification informing that SMS client has been unregistered. */
 #define AT_SMS_UNREGISTERED_NTF "+CMS ERROR: 524"
+
+#define MODEM_CFUN_NORMAL 1
+#define MODEM_CFUN_ACTIVATE_LTE 21
 
 /** @brief SMS structure where received SMS is parsed. */
 static struct sms_data sms_data_info;
@@ -77,8 +88,10 @@ static struct sms_subscriber subscribers[CONFIG_SMS_SUBSCRIBERS_MAX_CNT];
  * errors (CMS).
  */
 AT_MONITOR_ISR(sms_at_handler_cmt, "+CMT", sms_at_cmd_handler_cmt, PAUSED);
-AT_MONITOR_ISR(sms_at_handler_cds, "+CDS", sms_at_cmd_handler_cds, PAUSED);
 AT_MONITOR_ISR(sms_at_handler_cms, "+CMS", sms_at_cmd_handler_cms, PAUSED);
+#if defined(CONFIG_SMS_STATUS_REPORT)
+AT_MONITOR_ISR(sms_at_handler_cds, "+CDS", sms_at_cmd_handler_cds, PAUSED);
+#endif
 
 /* Keep this function public so that it can be called by tests. */
 void sms_ack_resp_handler(const char *resp)
@@ -139,8 +152,10 @@ static void sms_reregister(struct k_work *work)
 		LOG_ERR("Unable to re-register SMS client, err: %d", err);
 		/* Pause AT commands notifications. */
 		at_monitor_pause(&sms_at_handler_cmt);
-		at_monitor_pause(&sms_at_handler_cds);
 		at_monitor_pause(&sms_at_handler_cms);
+#if defined(CONFIG_SMS_STATUS_REPORT)
+		at_monitor_pause(&sms_at_handler_cds);
+#endif
 
 		/* Clear all observers. */
 		for (size_t i = 0; i < ARRAY_SIZE(subscribers); i++) {
@@ -163,7 +178,7 @@ static void sms_at_cmd_handler_cmt(const char *at_notif)
 
 	__ASSERT_NO_MSG(at_notif != NULL);
 
-	memset(&sms_data_info, 0, sizeof(struct sms_data));
+	k_work_reschedule(&sms_ack_work, K_NO_WAIT);
 
 	/* Parse AT command and SMS PDU */
 	err = sscanf(
@@ -173,22 +188,21 @@ static void sms_at_cmd_handler_cmt(const char *at_notif)
 		sms_buf_tmp);
 	if (err < 1) {
 		LOG_ERR("Unable to parse CMT notification, err=%d: %s", err, at_notif);
-		goto sms_ack_send;
+		return;
 	}
 
+	memset(&sms_data_info, 0, sizeof(struct sms_data));
 	sms_data_info.type = SMS_TYPE_DELIVER;
 	err = sms_deliver_pdu_parse(sms_buf_tmp, &sms_data_info);
 	if (err) {
-		goto sms_ack_send;
+		return;
 	}
 	LOG_DBG("Valid SMS notification decoded");
 
 	k_work_submit(&sms_notify_work);
-
-sms_ack_send:
-	k_work_reschedule(&sms_ack_work, K_NO_WAIT);
 }
 
+#if defined(CONFIG_SMS_STATUS_REPORT)
 /**
  * @brief Callback handler for CDS notification.
  *
@@ -203,9 +217,10 @@ static void sms_at_cmd_handler_cds(const char *at_notif)
 	memset(&sms_data_info, 0, sizeof(struct sms_data));
 	sms_data_info.type = SMS_TYPE_STATUS_REPORT;
 
-	k_work_submit(&sms_notify_work);
 	k_work_reschedule(&sms_ack_work, K_NO_WAIT);
+	k_work_submit(&sms_notify_work);
 }
+#endif
 
 /**
  * @brief Callback handler for CMS notification.
@@ -266,15 +281,19 @@ static int sms_init(void)
 
 	/* Register for AT commands notifications before creating the client. */
 	at_monitor_resume(&sms_at_handler_cmt);
-	at_monitor_resume(&sms_at_handler_cds);
 	at_monitor_resume(&sms_at_handler_cms);
+#if defined(CONFIG_SMS_STATUS_REPORT)
+	at_monitor_resume(&sms_at_handler_cds);
+#endif
 
 	/* Register this module as an SMS client. */
 	ret = nrf_modem_at_printf(AT_SMS_SUBSCRIBER_REGISTER);
 	if (ret) {
 		at_monitor_pause(&sms_at_handler_cmt);
-		at_monitor_pause(&sms_at_handler_cds);
 		at_monitor_pause(&sms_at_handler_cms);
+#if defined(CONFIG_SMS_STATUS_REPORT)
+		at_monitor_pause(&sms_at_handler_cds);
+#endif
 		LOG_ERR("Unable to register a new SMS client, err: %d", ret);
 		return ret;
 	}
@@ -367,9 +386,10 @@ static void sms_uninit(void)
 
 	/* Pause AT commands notifications. */
 	at_monitor_pause(&sms_at_handler_cmt);
-	at_monitor_pause(&sms_at_handler_cds);
 	at_monitor_pause(&sms_at_handler_cms);
-
+#if defined(CONFIG_SMS_STATUS_REPORT)
+	at_monitor_pause(&sms_at_handler_cds);
+#endif
 	sms_client_registered = false;
 }
 
@@ -402,11 +422,12 @@ int sms_send(const char *number, const uint8_t *data, uint16_t data_len, enum sm
 	}
 	return sms_submit_send(number, data, data_len, type);
 }
-
-#if defined(CONFIG_LTE_LINK_CONTROL)
-LTE_LC_ON_CFUN(sms_cfun_hook, sms_on_cfun, NULL);
-
-static void sms_on_cfun(enum lte_lc_func_mode mode, void *ctx)
+#ifdef CONFIG_UNITY
+void sms_on_cfun(int mode, void *ctx)
+#else
+NRF_MODEM_LIB_ON_CFUN(sms_cfun_hook, sms_on_cfun, NULL)
+static void sms_on_cfun(int mode, void *ctx)
+#endif
 {
 	int err;
 
@@ -414,8 +435,8 @@ static void sms_on_cfun(enum lte_lc_func_mode mode, void *ctx)
 	 * if it had been registered earlier.
 	 */
 	if (sms_client_registered) {
-		if (mode == LTE_LC_FUNC_MODE_NORMAL ||
-		    mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
+		if (mode == MODEM_CFUN_NORMAL ||
+		    mode == MODEM_CFUN_ACTIVATE_LTE) {
 
 			LOG_DBG("Reinitialize SMS subscription when LTE is set ON");
 
@@ -426,4 +447,3 @@ static void sms_on_cfun(enum lte_lc_func_mode mode, void *ctx)
 		}
 	}
 }
-#endif /* CONFIG_LTE_LINK_CONTROL */

@@ -46,22 +46,26 @@
 #define CHAN_TO_FREQ(_channel) (2400 + _channel)
 
 #if defined(CONFIG_SOC_SERIES_NRF54HX)
-	#define RADIO_TEST_EGU            NRF_EGU020
-	#define RADIO_TEST_TIMER_INSTANCE 020
-	#define RADIO_TEST_TIMER_IRQn     TIMER020_IRQn
-	#define RADIO_TEST_RADIO_IRQn     RADIO_0_IRQn
-	#define NRF_RADIO_SHORT_END_DISABLE_MASK NRF_RADIO_SHORT_PHYEND_DISABLE_MASK
+	#define RADIO_TEST_EGU                     NRF_EGU020
+	#define RADIO_TEST_TIMER_INSTANCE          020
+	#define RADIO_TEST_TIMER_IRQn              TIMER020_IRQn
+	#define RADIO_TEST_RADIO_IRQn              RADIO_0_IRQn
+	#define RADIO_TEST_SHORT_END_DISABLE_MASK  NRF_RADIO_SHORT_PHYEND_DISABLE_MASK
+	#define RADIO_TEST_SHORT_END_START_MASK    NRF_RADIO_SHORT_PHYEND_START_MASK
 #elif defined(CONFIG_SOC_SERIES_NRF54LX)
-	#define RADIO_TEST_EGU            NRF_EGU10
-	#define RADIO_TEST_TIMER_INSTANCE 10
-	#define RADIO_TEST_TIMER_IRQn     TIMER10_IRQn
-	#define RADIO_TEST_RADIO_IRQn     RADIO_0_IRQn
-	#define NRF_RADIO_SHORT_END_DISABLE_MASK NRF_RADIO_SHORT_PHYEND_DISABLE_MASK
+	#define RADIO_TEST_EGU                     NRF_EGU10
+	#define RADIO_TEST_TIMER_INSTANCE          10
+	#define RADIO_TEST_TIMER_IRQn              TIMER10_IRQn
+	#define RADIO_TEST_RADIO_IRQn              RADIO_0_IRQn
+	#define RADIO_TEST_SHORT_END_DISABLE_MASK  NRF_RADIO_SHORT_PHYEND_DISABLE_MASK
+	#define RADIO_TEST_SHORT_END_START_MASK    NRF_RADIO_SHORT_PHYEND_START_MASK
 #else
-	#define RADIO_TEST_EGU            NRF_EGU0
-	#define RADIO_TEST_TIMER_INSTANCE 0
-	#define RADIO_TEST_TIMER_IRQn     TIMER0_IRQn
-	#define RADIO_TEST_RADIO_IRQn     RADIO_IRQn
+	#define RADIO_TEST_EGU                     NRF_EGU0
+	#define RADIO_TEST_TIMER_INSTANCE          0
+	#define RADIO_TEST_TIMER_IRQn              TIMER0_IRQn
+	#define RADIO_TEST_RADIO_IRQn              RADIO_IRQn
+	#define RADIO_TEST_SHORT_END_DISABLE_MASK  NRF_RADIO_SHORT_END_DISABLE_MASK
+	#define RADIO_TEST_SHORT_END_START_MASK    NRF_RADIO_SHORT_END_START_MASK
 #endif /* defined(CONFIG_SOC_SERIES_NRF54HX) */
 
 #define RADIO_TEST_TIMER_IRQ_HANDLER  NRFX_CONCAT_3(nrfx_timer_,	    \
@@ -72,6 +76,9 @@
 #define ENDPOINT_EGU_RADIO_RX    BIT(2)
 #define ENDPOINT_TIMER_RADIO_TX  BIT(3)
 #define ENDPOINT_FORK_EGU_TIMER  BIT(4)
+
+/* RX timeout counted from the last packet received. */
+#define RX_PACKET_TIMEOUT_MS 100
 
 /* Buffer for the radio TX packet */
 static uint8_t tx_packet[RADIO_MAX_PAYLOAD_LEN];
@@ -99,6 +106,13 @@ static uint8_t ppi_radio_start;
 /* PPI endpoint status.*/
 static atomic_t endpoint_state;
 
+/*  Work element used to handle the end of packet reception. */
+static void rx_timeout_work_handler(struct k_work *work);
+K_WORK_DELAYABLE_DEFINE(rx_timeout_work, rx_timeout_work_handler);
+
+/* Pointer to rx timeout callback function. */
+static void (**rx_timeout_cb)(void);
+
 #if CONFIG_FEM
 static struct radio_test_fem fem;
 #endif /* CONFIG_FEM */
@@ -124,6 +138,11 @@ static uint16_t channel_to_frequency(nrf_radio_mode_t mode, uint8_t channel)
 static nrf_radio_txpower_t dbm_to_nrf_radio_txpower(int8_t tx_power)
 {
 	switch (tx_power) {
+#if defined(RADIO_TXPOWER_TXPOWER_Neg100dBm)
+	case -100:
+		return RADIO_TXPOWER_TXPOWER_Neg100dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg100dBm) */
+
 #if defined(RADIO_TXPOWER_TXPOWER_Neg70dBm)
 	case -70:
 		return RADIO_TXPOWER_TXPOWER_Neg70dBm;
@@ -142,13 +161,23 @@ static nrf_radio_txpower_t dbm_to_nrf_radio_txpower(int8_t tx_power)
 		return RADIO_TXPOWER_TXPOWER_Neg30dBm;
 #endif /* defined(RADIO_TXPOWER_TXPOWER_Neg30dBm) */
 
-#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm)
-	case -26:
-		return RADIO_TXPOWER_TXPOWER_Neg26dBm;
-#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) */
+#if defined(RADIO_TXPOWER_TXPOWER_Neg28dBm)
+	case -28:
+		return RADIO_TXPOWER_TXPOWER_Neg28dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg28dBm) */
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg22dBm)
+	case -22:
+		return RADIO_TXPOWER_TXPOWER_Neg22dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg22dBm) */
 
 	case -20:
 		return RADIO_TXPOWER_TXPOWER_Neg20dBm;
+
+#if defined(RADIO_TXPOWER_TXPOWER_Neg18dBm)
+	case -18:
+		return RADIO_TXPOWER_TXPOWER_Neg18dBm;
+#endif /* defined(RADIO_TXPOWER_TXPOWER_Neg18dBm) */
 
 	case -16:
 		return RADIO_TXPOWER_TXPOWER_Neg16dBm;
@@ -549,6 +578,61 @@ static void radio_config(nrf_radio_mode_t mode, enum transmit_pattern pattern)
 		/* preamble, address (BALEN + PREFIX), lflen and payload */
 		total_payload_size = 2 + (packet_conf.balen + 1) + 1 + packet_conf.maxlen;
 		break;
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_5)
+	case NRF_RADIO_MODE_NRF_4MBIT_H_0_5:
+		/* Packet configuration:
+		 * S1 size = 0 bits,
+		 * S0 size = 0 bytes,
+		 * 16-bit preamble.
+		 */
+		packet_conf.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+
+		/* preamble, address (BALEN + PREFIX), lflen and payload */
+		total_payload_size = 2 + (packet_conf.balen + 1) + 1 + packet_conf.maxlen;
+		break;
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_25)
+	case NRF_RADIO_MODE_NRF_4MBIT_H_0_25:
+		/* Packet configuration:
+		 * S1 size = 0 bits,
+		 * S0 size = 0 bytes,
+		 * 16-bit preamble.
+		 */
+		packet_conf.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+
+		/* preamble, address (BALEN + PREFIX), lflen and payload */
+		total_payload_size = 2 + (packet_conf.balen + 1) + 1 + packet_conf.maxlen;
+		break;
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_25) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_6:
+		/* Packet configuration:
+		 * S1 size = 0 bits,
+		 * S0 size = 0 bytes,
+		 * 16-bit preamble.
+		 */
+		packet_conf.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+
+		/* preamble, address (BALEN + PREFIX), lflen and payload */
+		total_payload_size = 2 + (packet_conf.balen + 1) + 1 + packet_conf.maxlen;
+		break;
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_4:
+		/* Packet configuration:
+		 * S1 size = 0 bits,
+		 * S0 size = 0 bytes,
+		 * 16-bit preamble.
+		 */
+		packet_conf.plen = NRF_RADIO_PREAMBLE_LENGTH_16BIT;
+
+		/* preamble, address (BALEN + PREFIX), lflen and payload */
+		total_payload_size = 2 + (packet_conf.balen + 1) + 1 + packet_conf.maxlen;
+		break;
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4) */
 
 	default:
 		/* Packet configuration:
@@ -623,6 +707,17 @@ static void radio_disable(void)
 #endif /* CONFIG_FEM */
 }
 
+static void mltpan_6(nrf_radio_mode_t mode)
+{
+#if defined(NRF54L_SERIES)
+	if (mode == NRF_RADIO_MODE_IEEE802154_250KBIT) {
+		*((volatile uint32_t *)0x5008A810) = 2;
+	}
+#else
+	ARG_UNUSED(mode);
+#endif /* defined(NRF54L_SERIES) */
+}
+
 #if NRF53_ERRATA_117_PRESENT
 static void errata_117(nrf_radio_mode_t mode)
 {
@@ -649,6 +744,7 @@ static void radio_mode_set(NRF_RADIO_Type *reg, nrf_radio_mode_t mode)
 {
 	errata_117(mode);
 	nrf_radio_mode_set(reg, mode);
+	mltpan_6(mode);
 }
 
 static void radio_unmodulated_tx_carrier(uint8_t mode, int8_t txpower, uint8_t channel)
@@ -704,9 +800,15 @@ static void radio_modulated_tx_carrier(uint8_t mode, int8_t txpower, uint8_t cha
 #if defined(RADIO_MODE_MODE_Nrf_4Mbit0_25)
 	case NRF_RADIO_MODE_NRF_4MBIT_H_0_25:
 #endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_25) */
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_6:
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_4:
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4) */
 		nrf_radio_shorts_enable(NRF_RADIO,
 					NRF_RADIO_SHORT_READY_START_MASK |
-					NRF_RADIO_SHORT_END_START_MASK);
+					RADIO_TEST_SHORT_END_START_MASK);
 		break;
 	}
 
@@ -729,7 +831,8 @@ static void radio_modulated_tx_carrier(uint8_t mode, int8_t txpower, uint8_t cha
 	radio_start(false, false);
 }
 
-static void radio_rx(uint8_t mode, uint8_t channel, enum transmit_pattern pattern)
+static void radio_rx(uint8_t mode, uint8_t channel, enum transmit_pattern pattern,
+		     uint32_t rx_packet_num)
 {
 	radio_disable();
 
@@ -756,6 +859,10 @@ static void radio_rx(uint8_t mode, uint8_t channel, enum transmit_pattern patter
 #endif /* CONFIG_FEM */
 
 	radio_start(true, sweep_processing);
+
+	if (rx_packet_num > 0) {
+		k_work_reschedule(&rx_timeout_work, K_SECONDS(CONFIG_RADIO_TEST_RX_TIMEOUT));
+	}
 }
 
 static void radio_sweep_start(uint8_t channel, uint32_t delay_ms)
@@ -803,7 +910,7 @@ static void radio_modulated_tx_carrier_duty_cycle(uint8_t mode, int8_t txpower,
 	radio_mode_set(NRF_RADIO, mode);
 	nrf_radio_shorts_enable(NRF_RADIO,
 				NRF_RADIO_SHORT_READY_START_MASK |
-				NRF_RADIO_SHORT_END_DISABLE_MASK);
+				RADIO_TEST_SHORT_END_DISABLE_MASK);
 	radio_power_set(mode, channel, txpower);
 	radio_channel_set(mode, channel);
 
@@ -866,7 +973,8 @@ void radio_test_start(const struct radio_test_config *config)
 	case RX:
 		radio_rx(config->mode,
 			config->params.rx.channel,
-			config->params.rx.pattern);
+			config->params.rx.pattern,
+			config->params.rx.packets_num);
 		break;
 	case TX_SWEEP:
 		radio_sweep_start(config->params.tx_sweep.channel_start,
@@ -946,6 +1054,14 @@ void toggle_dcdc_state(uint8_t dcdc_state)
 }
 #endif /* NRF_POWER_HAS_DCDCEN_VDDH || NRF_POWER_HAS_DCDCEN */
 
+static void rx_timeout_work_handler(struct k_work *work)
+{
+	radio_disable();
+	if (rx_timeout_cb != NULL && *rx_timeout_cb != NULL) {
+		(*rx_timeout_cb)();
+	}
+}
+
 static void timer_handler(nrf_timer_event_t event_type, void *context)
 {
 	const struct radio_test_config *config =
@@ -967,7 +1083,8 @@ static void timer_handler(nrf_timer_event_t event_type, void *context)
 			sweep_processing = true;
 			radio_rx(config->mode,
 				current_channel,
-				config->params.rx.pattern);
+				config->params.rx.pattern,
+				0);
 
 			channel_start = config->params.rx_sweep.channel_start;
 			channel_end = config->params.rx_sweep.channel_end;
@@ -1006,12 +1123,21 @@ void radio_handler(const void *context)
 	const struct radio_test_config *config =
 		(const struct radio_test_config *) context;
 
-	if (nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_CRCOK)) {
+	if (nrf_radio_int_enable_check(NRF_RADIO, NRF_RADIO_INT_CRCOK_MASK) &&
+	    nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_CRCOK)) {
 		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_CRCOK);
 		rx_packet_cnt++;
+		if (config->params.rx.packets_num) {
+			if (rx_packet_cnt == config->params.rx.packets_num) {
+				k_work_reschedule(&rx_timeout_work, K_NO_WAIT);
+			} else {
+				k_work_reschedule(&rx_timeout_work, K_MSEC(RX_PACKET_TIMEOUT_MS));
+			}
+		}
 	}
 
-	if (nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_END)) {
+	if (nrf_radio_int_enable_check(NRF_RADIO, NRF_RADIO_INT_END_MASK) &&
+	    nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_END)) {
 		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_END);
 
 		tx_packet_cnt++;
@@ -1038,6 +1164,8 @@ int radio_test_init(struct radio_test_config *config)
 		printk("Failed to allocate gppi channel.\n");
 		return -EFAULT;
 	}
+
+	rx_timeout_cb = &config->params.rx.cb;
 
 #if CONFIG_FEM
 	int err = fem_init(timer.p_reg,

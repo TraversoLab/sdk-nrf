@@ -210,7 +210,7 @@ To build this application to work with the nRF7002 Wi-Fi expansion board:
       .. group-tab:: nRF Connect for VS Code
 
          To build the application in the nRF Connect for VS Code IDE for Thingy:53 with the nRF7002 EB attached, add the expansion board and the file suffix variables in the build configuration's :guilabel:`Extra CMake arguments` and rebuild the build configuration.
-         For example: ``-- -Dmatter_weather_station_SHIELD=nrf7002eb -DFILE_SUFFIX=release -DSB_CONFIG_WIFI_NRF700X=y``.
+         For example: ``-- -Dmatter_weather_station_SHIELD=nrf7002eb -DFILE_SUFFIX=release -DSB_CONFIG_WIFI_NRF70=y``.
 
       .. group-tab:: Command line
 
@@ -218,12 +218,12 @@ To build this application to work with the nRF7002 Wi-Fi expansion board:
 
          .. code-block:: console
 
-            west build -b thingy53/nrf5340/cpuapp -- -Dmatter_weather_station_SHIELD=nrf7002eb -DFILE_SUFFIX=release -DSB_CONFIG_WIFI_NRF700X=y
+            west build -b thingy53/nrf5340/cpuapp -- -Dmatter_weather_station_SHIELD=nrf7002eb -DFILE_SUFFIX=release -DSB_CONFIG_WIFI_NRF70=y
 
 Generating factory data
 =======================
 
-To enable factory data support, you need to select the ``overlay-factory_data`` configuration overlay from the available application :ref:`build configuration overlays <matter_weather_station_app_build_configuration_overlays>`, set the :kconfig:option:`SB_CONFIG_MATTER_FACTORY_DATA_GENERATE` kconfig option to ``y``, and use the ``factory_data`` file suffix.
+To enable factory data support, you need to select the ``overlay-factory_data`` configuration overlay from the available application :ref:`build configuration overlays <matter_weather_station_app_build_configuration_overlays>`, set the ``SB_CONFIG_MATTER_FACTORY_DATA_GENERATE`` kconfig option to ``y``, and use the ``factory_data`` file suffix.
 You can generate new factory data set when building for the given board target by invoking the following command:
 
 .. code-block:: console

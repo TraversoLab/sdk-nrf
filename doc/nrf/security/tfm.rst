@@ -126,6 +126,22 @@ By using the :kconfig:option:`CONFIG_TFM_SECURE_UART0`. the TF-M UART instance b
 
   When the TF-M and application use the same UART, the TF-M will disable logging after it has booted and it will only re-enable it again to log a fatal error.
 
+Provisioning
+************
+
+For the devices that need provisioning, TF-M implements the following Platform Root of Trust (PRoT) Security Lifecycle states that conform to the `ARM Platform Security Model 1.1`_:
+
+* Device Assembly and Test
+* PRoT Provisioning
+* Secured
+
+The device starts in the **Device Assembly and Test** state.
+The :ref:`provisioning_image` sample shows how to move the device from the **Device Assembly and Test** state to the **PRoT Provisioning** state, and how to provision the device with hardware unique keys (HUKs) and an identity key.
+
+To move the device from the **PRoT Provisioning** state to the **Secured** state, set the :kconfig:option:`CONFIG_TFM_NRF_PROVISIONING` Kconfig option for your application.
+In the first boot, TF-M will ensure that the keys are stored in the Key Management Unit (KMU) and move the device to the **Secured** state.
+The :ref:`tfm_psa_template` sample shows how to achieve this.
+
 .. _ug_tfm_manual_VCOM_connection:
 
 Manual connection to Virtual COM ports on the nRF5340 DK
@@ -174,22 +190,24 @@ The following limitations apply to TF-M and its usage:
 TF-M partition alignment requirements
 *************************************
 
-TF-M requires that secure and non-secure partition addresses must be aligned to the NRF_SPU flash region size :kconfig:option:`CONFIG_NRF_SPU_FLASH_REGION_SIZE`.
+TF-M requires that secure and non-secure partition addresses must be aligned to the flash region size :kconfig:option:`CONFIG_NRF_TRUSTZONE_FLASH_REGION_SIZE`.
 |NCS| ensures that they in fact are aligned and comply with the TF-M requirements.
 
-TF-M requires this alignment because it uses the SPU to enforce the security policy between the partitions.
+In nRF53 and nRF91 series TF-M uses the SPU to enforce the security policy between the partitions, so the :kconfig:option:`CONFIG_NRF_TRUSTZONE_FLASH_REGION_SIZE` is set to the SPU flash region size.
+In nRF54L15 TF-M uses the MPC to enforce the security policy between the partitions, so the :kconfig:option:`CONFIG_NRF_TRUSTZONE_FLASH_REGION_SIZE` is set to the MPC region size.
+
 When the :ref:`partition_manager` is enabled, it will take into consideration the alignment requirements.
 But when the static partitions are used, the user is responsible for following the alignment requirements.
 
 If you are experiencing any partition alignment issues when using the Partition Manager, check the :ref:`known_issues` page on the main branch.
 
-The partitions which need to be aligned to the SPU flash region size are partitions ``tfm_nonsecure`` and ``nonsecure_storage``.
-Both the partition start address and the partition size need to be aligned with the NRF_SPU flash region size :kconfig:option:`CONFIG_NRF_SPU_FLASH_REGION_SIZE`.
+The partitions which need to be aligned with the TrustZone flash region size are partitions ``tfm_nonsecure`` and ``nonsecure_storage``.
+Both the partition start address and the partition size need to be aligned with the flash region size :kconfig:option:`CONFIG_NRF_TRUSTZONE_FLASH_REGION_SIZE`.
 
 Note that the ``tfm_nonsecure`` partition is placed after the ``tfm_secure`` partition, thus the end address of the ``tfm_secure`` partition is the same as the start address of the ``tfm_nonsecure`` partition.
 As a result, altering the size of the ``tfm_secure`` partition affects the start address of the ``tfm_nonsecure`` partition.
 
-The following static partition snippet shows a non-aligned configuration for nRF5340 which has a SPU flash region size :kconfig:option:`CONFIG_NRF_SPU_FLASH_REGION_SIZE` of 0x4000.
+The following static partition snippet shows a non-aligned configuration for nRF5340 which has a TrustZone flash region size :kconfig:option:`CONFIG_NRF_TRUSTZONE_FLASH_REGION_SIZE` of 0x4000.
 
 .. code-block:: console
 
@@ -211,7 +229,7 @@ The following static partition snippet shows a non-aligned configuration for nRF
       address: 0x8200
       size: 0x4000
 
-In the above example, the ``tfm_nonsecure`` partition starts at address 0x8200, which is not aligned with the SPU requirement of 0x4000.
+In the above example, the ``tfm_nonsecure`` partition starts at address 0x8200, which is not aligned with the requirement of 0x4000.
 Since ``tfm_secure`` spans the ``mcuboot_pad`` and ``tfm`` partitions we can decrease the size of any of them by 0x200 to fix the alignment issue.
 We will decrease the size of the (optional) ``mcuboot_pad`` partition and thus the size of the ``tfm_secure`` partition as follows:
 

@@ -30,29 +30,29 @@ The Fast Pair service also contains additional GATT characteristics under the fo
 Configuration
 *************
 
-Set the :kconfig:option:`CONFIG_BT_FAST_PAIR` Kconfig option to enable the service.
+The Fast Pair Service is enabled with :kconfig:option:`CONFIG_BT_FAST_PAIR` Kconfig option set in the main application image.
 
-The following Kconfig options are also available for this service:
+.. note::
+   When building with sysbuild, value of the :kconfig:option:`CONFIG_BT_FAST_PAIR` Kconfig option is overwritten by ``SB_CONFIG_BT_FAST_PAIR``.
+   For more details about enabling Fast Pair for your application, see the :ref:`ug_bt_fast_pair_prerequisite_ops_kconfig` section in the Fast Pair integration guide.
+
+With the :kconfig:option:`CONFIG_BT_FAST_PAIR` Kconfig option enabled, the following Kconfig options are available for this service:
 
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_GATT_SERVICE_MODEL_ID` - The option adds the Model ID characteristic to the Fast Pair GATT service.
-  This option is enabled by default unless the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN` is enabled.
-  This is done to align default configuration with `Fast Pair Device Feature Requirements for Locator Tags`_ documentation.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_REQ_PAIRING` - The option enforces the requirement for Bluetooth pairing and bonding during the `Fast Pair Procedure`_.
-  This option is enabled by default.
   See the :ref:`ug_bt_fast_pair_gatt_service_no_ble_pairing` for more details.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_SUBSEQUENT_PAIRING` - The option adds support for the Fast Pair subsequent pairing feature.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_STORAGE_USER_RESET_ACTION` - The option enables user reset action that is executed together with the Fast Pair factory reset operation.
   See the :ref:`ug_bt_fast_pair_factory_reset_custom_user_reset_action` for more details.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_STORAGE_ACCOUNT_KEY_MAX` - The option configures maximum number of stored Account Keys.
-* :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_TINYCRYPT`, :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_MBEDTLS`, :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_OBERON`, and :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_PSA` - These options are used to select the cryptographic backend for Fast Pair.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_TINYCRYPT`, :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_OBERON`, and :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_PSA` - These options are used to select the cryptographic backend for Fast Pair.
   The Oberon backend is used by default.
-  The Mbed TLS backend uses Mbed TLS crypto APIs that are now considered legacy APIs.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_PN` - The option enables the `Fast Pair Personalized Name extension`_.
-  This option is enabled by default unless the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN` is enabled.
-  This is done to align default configuration with `Fast Pair Device Feature Requirements for Locator Tags`_ documentation.
 
   * :kconfig:option:`CONFIG_BT_FAST_PAIR_STORAGE_PN_LEN_MAX` - The option specifies the maximum length of a stored Fast Pair Personalized Name.
 
-* :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN` - The option enables the FMDN extension.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_BN` - The option enables the `Fast Pair Battery Notification extension`_.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN` - The option enables the `Fast Pair Find My Device Network extension`_.
 
   * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_DULT` - The option enables the Detecting Unwanted Location Trackers (DULT) support in the FMDN extension (see :ref:`ug_bt_fast_pair_prerequisite_ops_fmdn_dult_integration`):
 
@@ -93,6 +93,8 @@ The following Kconfig options are also available for this service:
 
     * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_CLOCK_NVM_UPDATE_TIME` - The option configures the time interval (in minutes) of periodic beacon clock writes to the non-volatile memory.
     * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_CLOCK_NVM_UPDATE_RETRY_TIME` - The option configures the retry time (in seconds) when the beacon clock write to the non-volatile memory fails.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_UNKNOWN`, :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_INPUT_DEVICE`, :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_LOCATOR_TAG`and :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_MOUSE` - These options are used to select the Fast Pair use case and configure the Fast Pair library according to the `Fast Pair Device Feature Requirements`_ for the chosen use case.
+  The :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_UNKNOWN` Kconfig option is used by default.
 
 See the Kconfig help for details.
 
@@ -129,13 +131,11 @@ The Fast Pair specification requires support for Bluetooth® Low Energy pairing 
 Firmware Revision characteristic
 --------------------------------
 
-The Fast Pair specification requires enabling GATT Device Information Service and the Firmware Revision characteristic.
-For this reason, the default values of the Kconfig options :kconfig:option:`CONFIG_BT_DIS` and :kconfig:option:`CONFIG_BT_DIS_FW_REV`, respectively, are set to enabled.
-The default value of :kconfig:option:`CONFIG_BT_DIS_FW_REV_STR` is set to :kconfig:option:`CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION` if :kconfig:option:`CONFIG_BOOTLOADER_MCUBOOT` is enabled.
-Otherwise, it is set to ``0.0.0+0``.
+The Fast Pair specification requires enabling GATT Device Information Service and the Firmware Revision characteristic for selected Fast Pair use cases (for example, the input device use case).
 
-This requirement does not apply for the locator tag use case as specified in the `Fast Pair Device Feature Requirements for Locator Tags`_ documentation.
-As a result, these Kconfig overrides are not applied when the :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN` Kconfig option is enabled.
+For this reason, the relevant use case Kconfig options (for example, the :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_INPUT_DEVICE` Kconfig option) select the :kconfig:option:`CONFIG_BT_DIS` and :kconfig:option:`CONFIG_BT_DIS_FW_REV` Kconfig options.
+If the target project uses Zephyr's :ref:`application version management <zephyr:app-version-details>`, the default value of the :kconfig:option:`CONFIG_BT_DIS_FW_REV_STR` Kconfig option is set according to the versioning information found in the :file:`VERSION` file.
+Otherwise, it is set to ``0.0.0+0``.
 
 MTU configuration
 -----------------
@@ -221,8 +221,6 @@ API documentation
 | Source files: :file:`subsys/bluetooth/services/fast_pair`
 
 .. doxygengroup:: bt_fast_pair
-   :project: nrf
-   :members:
 
 FMDN extension
 ==============
@@ -231,8 +229,6 @@ FMDN extension
 | Source files: :file:`subsys/bluetooth/services/fast_pair/fmdn`
 
 .. doxygengroup:: bt_fast_pair_fmdn
-   :project: nrf
-   :members:
 
 Fast Pair UUID API
 ==================
@@ -241,5 +237,3 @@ Fast Pair UUID API
 | Source files: :file:`subsys/bluetooth/services/fast_pair`
 
 .. doxygengroup:: bt_fast_pair_uuid
-   :project: nrf
-   :members:

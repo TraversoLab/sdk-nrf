@@ -1,5 +1,5 @@
 python:
-  version: 3.9.18
+  version: 3.12.4
 git:
   version: 2.37.3
 cmake:
@@ -17,10 +17,8 @@ gn:
 nanopb:
   version: 0.4.6
 zephyr-sdk:
-  version: 0.16.5-1
-  architectures: # https://github.com/zephyrproject-rtos/sdk-ng/releases/tag/v0.16.5-1
-    - aarch64-zephyr-elf
-    - x86_64-zephyr-elf
+  version: 0.16.8
+  architectures: # https://github.com/zephyrproject-rtos/sdk-ng/releases/tag/v0.16.8
     - arm-zephyr-eabi
     - riscv64-zephyr-elf
 ccache:
@@ -28,4 +26,6 @@ ccache:
 dfu_util:
   version: 0.9-1
 doxygen:
-  version: 1.9.6
+  version: 1.12.0
+pip:
+  version: 24.2

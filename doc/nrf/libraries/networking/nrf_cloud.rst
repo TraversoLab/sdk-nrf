@@ -141,6 +141,7 @@ Configuration options for device ID
 
 * :kconfig:option:`CONFIG_NRF_CLOUD_CLIENT_ID_SRC_HW_ID` - If you enable this option, the ID is automatically generated using a unique hardware ID (for example, a MAC address).
   You can choose the required hardware ID using the ``HW_ID_LIBRARY_SOURCE`` Kconfig choice.
+  See the :ref:`lib_hw_id` library documentation for details.
 
 * :kconfig:option:`CONFIG_NRF_CLOUD_CLIENT_ID_SRC_RUNTIME` - If you enable this option, the ID is set at runtime.
   If the nRF Cloud library is used directly, set the NULL-terminated ID string in the :c:struct:`nrf_cloud_init_param` structure when calling the :c:func:`nrf_cloud_init` function.
@@ -153,6 +154,7 @@ Firmware over-the-air (FOTA) updates
 The nRF Cloud library supports FOTA updates for your nRF91 Series device.
 The :kconfig:option:`CONFIG_NRF_CLOUD_FOTA` Kconfig option is enabled by default when :kconfig:option:`CONFIG_NRF_CLOUD_MQTT` is set.
 This enables FOTA functionality in the application.
+FOTA support for applications using CoAP or REST is enabled with the :kconfig:option:`CONFIG_NRF_CLOUD_FOTA_POLL` Kconfig option.
 
 nRF Cloud FOTA enables the following additional features and libraries:
 
@@ -180,6 +182,7 @@ Following are the supported FOTA types:
   Consider the power and network costs before deploying full modem FOTA updates.
 * ``"MODEM"`` - :ref:`Delta modem FOTA <nrf_modem_delta_dfu>` applies incremental changes between specific versions of the modem firmware.
   Delta modem updates are much smaller in size and do not require external memory.
+* ``"SMP"`` - Updates an auxiliary device's firmware using the :ref:`Simple Management Protocol <zephyr:device_mgmt>`.
 
 For example, a device that supports all the FOTA types writes the following data into the device shadow:
 
@@ -267,8 +270,6 @@ API documentation
 | Source files: :file:`subsys/net/lib/nrf_cloud/src/`
 
 .. doxygengroup:: nrf_cloud
-   :project: nrf
-   :members:
 
 nRF Cloud codec documentation
 *****************************
@@ -276,8 +277,6 @@ nRF Cloud codec documentation
 | Header file: :file:`include/net/nrf_cloud_codec.h`
 
 .. doxygengroup:: nrf_cloud_codec
-   :project: nrf
-   :members:
 
 nRF Cloud common definitions
 ****************************
@@ -285,8 +284,6 @@ nRF Cloud common definitions
 | Header file: :file:`include/net/nrf_cloud_defs.h`
 
 .. doxygengroup:: nrf_cloud_defs
-   :project: nrf
-   :members:
 
 nRF Cloud FOTA poll for REST and CoAP
 ****************************************
@@ -294,5 +291,3 @@ nRF Cloud FOTA poll for REST and CoAP
 | Header file: :file:`include/net/nrf_cloud_fota_poll.h`
 
 .. doxygengroup:: nrf_cloud_fota_poll
-   :project: nrf
-   :members:

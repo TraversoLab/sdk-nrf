@@ -56,10 +56,6 @@ static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
 };
 
-static const char img[] =
-#include "img.file"
-;
-
 static void button_handler_cb(uint32_t button_state, uint32_t has_changed);
 
 static const char *phy2str(uint8_t phy)
@@ -183,7 +179,7 @@ static void connected(struct bt_conn *conn, uint8_t hci_err)
 			return;
 		}
 
-		printk("Connection failed (err 0x%02x)\n", hci_err);
+		printk("Connection failed, err 0x%02x %s\n", hci_err, bt_hci_err_to_str(hci_err));
 		return;
 	}
 
@@ -213,10 +209,10 @@ static void connected(struct bt_conn *conn, uint8_t hci_err)
 	}
 }
 
-void security_changed(struct bt_conn *conn, bt_security_t level,
-				 enum bt_security_err security_err)
+void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err security_err)
 {
-	printk("Security changed: level %i, err: %i\n", level, security_err);
+	printk("Security changed: level %i, err: %i %s\n", level, security_err,
+	       bt_security_err_to_str(security_err));
 
 	if (security_err != 0) {
 		printk("Failed to encrypt link\n");
@@ -284,7 +280,7 @@ static void scan_start(void)
 
 static void adv_start(void)
 {
-	struct bt_le_adv_param *adv_param =
+	const struct bt_le_adv_param *adv_param =
 		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE |
 				BT_LE_ADV_OPT_ONE_TIME,
 				BT_GAP_ADV_FAST_INT_MIN_2,
@@ -305,7 +301,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	struct bt_conn_info info = {0};
 	int err;
 
-	printk("Disconnected (reason 0x%02x)\n", reason);
+	printk("Disconnected, reason 0x%02x %s\n", reason, bt_hci_err_to_str(reason));
 
 	test_ready = false;
 	if (default_conn) {
@@ -551,11 +547,6 @@ int test_run(const struct shell *shell,
 	int64_t delta;
 	uint32_t data = 0;
 
-	const char *img_ptr = img;
-	char str_buf[7];
-	int str_len;
-
-
 	/* a dummy data buffer */
 	static char dummy[495];
 
@@ -578,6 +569,9 @@ int test_run(const struct shell *shell,
 		return err;
 	}
 
+	shell_print(shell, "The test is in progress and will require around %d seconds "
+		"to complete.", CONFIG_BT_THROUGHPUT_DURATION / 1000);
+
 	/* Make sure that all BLE procedures are finished. */
 	k_sleep(K_MSEC(500));
 
@@ -591,35 +585,15 @@ int test_run(const struct shell *shell,
 	/* get cycle stamp */
 	stamp = k_uptime_get_32();
 
-	if (IS_ENABLED(CONFIG_BT_THROUGHPUT_FILE)) {
-		while (*img_ptr) {
-			err = bt_throughput_write(&throughput, dummy, 495);
-			if (err) {
-				shell_error(shell, "GATT write failed (err %d)", err);
-				break;
-			}
-
-			/* print graphics */
-			str_len = (*img_ptr == '\x1b') ? 6 : 1;
-			memcpy(str_buf, img_ptr, str_len);
-			str_buf[str_len] = '\0';
-			img_ptr += str_len;
-			printk("%s", str_buf);
-
-			data += 495;
+	while (true) {
+		err = bt_throughput_write(&throughput, dummy, 495);
+		if (err) {
+			shell_error(shell, "GATT write failed (err %d)", err);
+			break;
 		}
-	} else {
-		delta = 0;
-		while (true) {
-			err = bt_throughput_write(&throughput, dummy, 495);
-			if (err) {
-				shell_error(shell, "GATT write failed (err %d)", err);
-				break;
-			}
-			data += 495;
-			if (k_uptime_get_32() - stamp > CONFIG_BT_THROUGHPUT_DURATION) {
-				break;
-			}
+		data += 495;
+		if (k_uptime_get_32() - stamp > CONFIG_BT_THROUGHPUT_DURATION) {
+			break;
 		}
 	}
 
@@ -676,8 +650,14 @@ int main(void)
 	}
 
 	printk("\n");
-	printk("Press button 1 or type \"central\" on the central board.\n");
-	printk("Press button 2 or type \"peripheral\" on the peripheral board.\n");
+
+	if (IS_ENABLED(CONFIG_SOC_SERIES_NRF54HX) || IS_ENABLED(CONFIG_SOC_SERIES_NRF54LX)) {
+		printk("Press button 0 or type \"central\" on the central board.\n");
+		printk("Press button 1 or type \"peripheral\" on the peripheral board.\n");
+	} else {
+		printk("Press button 1 or type \"central\" on the central board.\n");
+		printk("Press button 2 or type \"peripheral\" on the peripheral board.\n");
+	}
 
 	buttons_init();
 

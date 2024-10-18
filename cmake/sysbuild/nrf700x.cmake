@@ -5,23 +5,18 @@
 #
 
 function(setup_nrf700x_xip_data)
-  include(${CMAKE_BINARY_DIR}/${DEFAULT_IMAGE}/zephyr/dts.cmake)
-
-  get_target_property(qspi_nodelabel devicetree_target "DT_NODELABEL|qspi")
-  get_target_property(qspi_device devicetree_target "DT_REG|${qspi_nodelabel}|ADDR")
-  get_target_property(qspi_modes devicetree_target "DT_PROP|${qspi_nodelabel}|reg-names")
-  list(FIND qspi_modes "qspi_mm" qspi_mm_mode_position)
-  list(GET qspi_device "${qspi_mm_mode_position}" qspi_xip_address)
+  sysbuild_dt_nodelabel(qspi_nodelabel IMAGE ${DEFAULT_IMAGE} NODELABEL "qspi")
+  sysbuild_dt_reg_addr(qspi_xip_address IMAGE ${DEFAULT_IMAGE} PATH "${qspi_nodelabel}" NAME "qspi_mm")
 
   set(OS_AGNOSTIC_BASE ${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_wifi)
 
-  if(SB_CONFIG_WIFI_NRF700X_SYSTEM_MODE)
+  if(SB_CONFIG_WIFI_NRF70_SYSTEM_MODE)
     set(NRF70_PATCH ${OS_AGNOSTIC_BASE}/fw_bins/default/nrf70.bin)
-  elseif(SB_CONFIG_WIFI_NRF700X_RADIO_TEST)
+  elseif(SB_CONFIG_WIFI_NRF70_RADIO_TEST)
     set(NRF70_PATCH ${OS_AGNOSTIC_BASE}/fw_bins/radio_test/nrf70.bin)
-  elseif(SB_CONFIG_WIFI_NRF700X_SCAN_ONLY)
+  elseif(SB_CONFIG_WIFI_NRF70_SCAN_ONLY)
     set(NRF70_PATCH ${OS_AGNOSTIC_BASE}/fw_bins/scan_only/nrf70.bin)
-  elseif(SB_CONFIG_WIFI_NRF700X_SYSTEM_WITH_RAW_MODES)
+  elseif(SB_CONFIG_WIFI_NRF70_SYSTEM_WITH_RAW_MODES)
     set(NRF70_PATCH ${OS_AGNOSTIC_BASE}/fw_bins/system_with_raw/nrf70.bin)
   else()
     # Error

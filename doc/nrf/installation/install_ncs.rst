@@ -9,7 +9,7 @@ Installing the |NCS|
    :local:
    :depth: 2
 
-There are different ways to install the |NCS|, depending on your preferred development environment and the :ref:`toolchain management tool <toolchain_management_tools>`:
+There are different ways to install the |NCS|, depending on your preferred development environment:
 
 * Using |VSC| and the |nRFVSC| (recommended)
 * Using command line and nRF Util
@@ -17,20 +17,19 @@ There are different ways to install the |NCS|, depending on your preferred devel
 Regardless of which way you choose, the following steps install the |NCS| source code and the |NCS| :term:`toolchain`.
 This includes everything that is required by Zephyr's :ref:`zephyr:getting_started` together with additional tools and Python dependencies that the |NCS| uses.
 
-Using |VSC| and the |nRFVSC| is also covered in the `Installing nRF Connect SDK and VS Code`_ exercise of the `nRF Connect SDK Fundamentals course`_ on Nordic Developer Academy.
+.. note::
+    Using |VSC| and the |nRFVSC| is also covered in the `Installing nRF Connect SDK and VS Code`_ exercise of the `nRF Connect SDK Fundamentals course`_ on Nordic Developer Academy.
 
 .. rst-class:: numbered-step
 
 Update operating system
 ***********************
 
-Before you start setting up the toolchain, install available updates for your operating system.
+Before you start setting up the toolchain, install available updates for your :ref:`operating system <supported_OS>` to make sure it supports the |NCS| firmware.
 
 .. include:: ./recommended_versions.rst
     :start-after: os_table_start
     :end-before: os_table_end
-
-See :ref:`supported_OS` for more information about the tier definitions.
 
 .. _installing_vsc:
 
@@ -39,33 +38,45 @@ See :ref:`supported_OS` for more information about the tier definitions.
 Install prerequisites
 *********************
 
-Depending on your preferred development environment, install the following required tools:
+Depending on your preferred development environment, install the following required tools.
+
 
 .. tabs::
 
    .. group-tab:: nRF Connect for Visual Studio Code
 
-      * The latest version of the :ref:`requirements_clt` package.
-        Download it from the `nRF Command Line Tools`_ page.
-      * The latest version of |VSC| for your operating system from the `Visual Studio Code download page`_.
-      * In |VSC|, the latest version of the `nRF Connect for VS Code Extension Pack`_.
-      * Linux users: `nrf-udev`_ module with udev rules required to access USB ports on Nordic Semiconductor devices and program the firmware.
+      * All operating systems:
+
+        * The latest version of the :ref:`requirements_clt` package.
+          Check :ref:`operating system versions that support this tool <additional_nordic_sw_tools>` and download the installer from the `nRF Command Line Tools`_ page.
+        * The |jlink_ver_vsc| of :ref:`SEGGER J-Link <requirements_jlink>`.
+          Download it from the `J-Link Software and Documentation Pack`_ page.
+        * The latest version of |VSC| for your operating system from the `Visual Studio Code download page`_.
+        * In |VSC|, the latest version of the `nRF Connect for VS Code Extension Pack`_.
+
+      * Additionally for Linux users: the `nrf-udev`_ module with udev rules required to access USB ports on Nordic Semiconductor devices and program the firmware.
 
    .. group-tab:: Command line
 
-      * The latest version of `nRF Util development tool`_, a unified command line utility for Nordic products.
+      * All operating systems:
 
-        .. note::
-            After downloading the nRF Util executable, move it to a directory that is in the system :envvar:`PATH`.
-            On macOS and Linux, the downloaded file also needs to be given execute permission by typing `chmod +x nrfutil` or by checking the checkbox in the file properties.
+        * The latest version of nRF Util, a unified command-line utility for Nordic Semiconductor products.
+          Check :ref:`operating system versions that support this tool <additional_nordic_sw_tools>` and download the installer from the `nRF Util development tool`_ page.
 
-      * The latest version of the :ref:`requirements_clt` package.
-        Download it from the `nRF Command Line Tools`_ page.
+          .. note::
+              After downloading the nRF Util executable, move it to a directory that is in the system :envvar:`PATH`.
+              On macOS and Linux, the downloaded file also needs to be given execute permission by typing `chmod +x nrfutil` or by checking the checkbox in the file properties.
 
-        .. note::
-            After downloading and installing the tools, add nrfjprog to the system :envvar:`PATH` in the environment variables.
+        * The latest version of the :ref:`requirements_clt` package.
+          Check :ref:`operating system versions that support this tool <additional_nordic_sw_tools>` and download the installer from the `nRF Command Line Tools`_ page.
 
-      * Linux users: `nrf-udev`_ module with udev rules required to access USB ports on Nordic Semiconductor devices and program the firmware.
+         .. note::
+               After downloading and installing the tools, add nrfjprog to the system :envvar:`PATH` in the environment variables.
+
+        * The |jlink_ver| of :ref:`SEGGER J-Link <requirements_jlink>`.
+          Download it from the `J-Link Software and Documentation Pack`_ page.
+
+      * Additionally for Linux users: the `nrf-udev`_ module with udev rules required to access USB ports on Nordic Semiconductor devices and program the firmware.
 
 .. _gs_installing_toolchain:
 .. _gs_installing_tools:
@@ -76,9 +87,10 @@ Install the |NCS| toolchain
 ***************************
 
 The |NCS| :term:`toolchain` includes the Zephyr SDK and then adds tools and modules required to build |NCS| samples and applications on top of it.
-These include the :ref:`required tools <requirements_toolchain_tools>`, the Python dependencies, and the :ref:`GN tool <ug_matter_gs_tools_gn>` for creating :ref:`ug_matter` applications.
+These include the :ref:`required tools <requirements_toolchain_tools>`, the :ref:`Python dependencies <requirements_toolchain_python_deps>`, and the :ref:`GN tool <ug_matter_gs_tools_gn>` for creating :ref:`ug_matter` applications.
 
-When you first install the |NCS|, it is recommended to install the latest released versions of the SDK and the toolchain.
+.. note::
+    When you first install the |NCS|, it is recommended to install the latest released, stable versions of the SDK and the toolchain.
 
 Depending on your preferred development environment, complete the following steps:
 
@@ -87,10 +99,13 @@ Depending on your preferred development environment, complete the following step
    .. group-tab:: nRF Connect for Visual Studio Code
 
       1. Open the nRF Connect extension in |VSC| by clicking its icon in the :guilabel:`Activity Bar`.
-      #. In the extension's :guilabel:`Welcome View`, click on :guilabel:`Install Toolchain`.
+      #. In the extension's :guilabel:`Welcome View`, click on :guilabel:`Manage toolchains`.
+         The list of actions appears in the |VSC|'s quick pick.
+      #. Click :guilabel:`Install Toolchain`.
+         The list of available toolchain versions appears in the |VSC|'s quick pick.
       #. Select the toolchain version to install.
          The toolchain version should match the |NCS| version you are going to work with.
-         If you have received a custom URL for installing the toolchain, you can provide it using the :guilabel:`Change Toolchain Index` button in the quick pick's header.
+         If you have received a custom URL for installing the toolchain, you can provide it using the :guilabel:`Change Toolchain Index` button in the quick pick's header (wrench icon).
          The toolchain installation starts in the background, as can be seen in the notification that appears.
 
       When you install the toolchain for the first time, the installed version is automatically selected for your project.
@@ -147,6 +162,8 @@ Depending on your preferred development environment, complete the following step
       To check the current configuration setting, use the ``nrfutil toolchain-manager config --show`` command.
       To read more about these commands, use the ``nrfutil toolchain-manager --help`` command.
 
+You can check the versions of the required tools and Python dependencies on the :ref:`Requirements reference page <requirements_toolchain>`.
+
 .. _cloning_the_repositories_win:
 .. _cloning_the_repositories:
 
@@ -176,7 +193,7 @@ Simply put, you can work with the following versions of the |NCS|:
      - `sdk-nrf`_ repository
 
 .. note::
-   Unless you are familiar with the :ref:`development process <dev-model>`, you should always work with a specific release of the |NCS|.
+   Unless you are familiar with the :ref:`development process <dev-model>`, you should always work with a specific, stable release of the |NCS|.
 
 For more information about the repository and development model, see the :ref:`dm_code_base` page.
 
@@ -290,20 +307,20 @@ For more information about the repository and development model, see the :ref:`d
 
 ..
 
-If you used the default locations, your directory structure now looks similar to this:
+If you used the default locations (:file:`C:\ncs` on Windows, :file:`<home>/ncs` on Linux and MacOS), your directory structure now looks similar to this:
 
 .. code-block:: none
 
-   <home>/
-   ├─── toolchains/
+   ncs
+   ├─── toolchains
    │  └─── <toolchain-installation>
-   └─── <west-workspace>/
-      ├─── .west/
-      ├─── bootloader/
-      ├─── modules/
-      ├─── nrf/
-      ├─── nrfxlib/
-      ├─── zephyr/
+   └─── <west-workspace>
+      ├─── .west
+      ├─── bootloader
+      ├─── modules
+      ├─── nrf
+      ├─── nrfxlib
+      ├─── zephyr
       └─── ...
 
 In this simplified structure preview, *<home>* corresponds to :file:`ncs/` and *<toolchain-installation>* and *<west-workspace>* correspond to the version names you installed.
@@ -328,23 +345,31 @@ Define the required environment variables as follows, depending on your operatin
 
    .. tab:: Windows
 
-      Navigate to the :file:`ncs` directory and run the following command in a terminal window:
+      Complete the following steps:
 
-      .. code-block:: console
+      1. Navigate to the :file:`ncs` directory.
+      #. Open the directory for your |NCS| version.
+      #. Run the following command in a terminal window:
 
-         zephyr/zephyr-env.cmd
+         .. code-block:: console
 
-      If you need to define additional environment variables, create the file :file:`%userprofile%\\zephyrrc.cmd` and add the variables there.
+            zephyr\zephyr-env.cmd
+
+      If you need to define additional environment variables, create the file :file:`%userprofile%/zephyrrc.cmd` and add the variables there.
       This file is loaded automatically when you run the above command.
       See :ref:`Zephyr documentation about using zephyrrc files <zephyr:env_vars_zephyrrc>` for more information.
 
    .. tab:: Linux
 
-      Navigate to the :file:`ncs` directory and run the following command in a terminal window:
+      Complete the following steps:
 
-      .. code-block:: console
+      1. Navigate to the :file:`ncs` directory.
+      #. Open the directory for your |NCS| version.
+      #. Run the following command in a terminal window:
 
-         source zephyr/zephyr-env.sh
+         .. code-block:: console
+
+            source zephyr/zephyr-env.sh
 
       If you need to define additional environment variables, create the file :file:`~/.zephyrrc` and add the variables there.
       This file is loaded automatically when you run the above command.
@@ -352,11 +377,15 @@ Define the required environment variables as follows, depending on your operatin
 
    .. tab:: macOS
 
-      Navigate to the :file:`ncs` directory and run the following command in a terminal window:
+      Complete the following steps:
 
-      .. code-block:: console
+      1. Navigate to the :file:`ncs` directory.
+      #. Open the directory for your |NCS| version.
+      #. Run the following command in a terminal window:
 
-         source zephyr/zephyr-env.sh
+         .. code-block:: console
+
+            source zephyr/zephyr-env.sh
 
       If you need to define additional environment variables, create the file :file:`~/.zephyrrc` and add the variables there.
       This file is loaded automatically when you run the above command.
@@ -586,22 +615,24 @@ To install the |NCS| system-wide, complete the following steps:
 .. _gs_assistant:
 .. _auto_installation_tcm_setup:
 
-Legacy installation with Toolchain Manager
-******************************************
+Installation with Toolchain Manager
+***********************************
 
-.. important::
-     Toolchain Manager installation is recommended for the |NCS| v1.9.x and earlier.
+Toolchain Manager is a SDK and toolchain installer for the |NCS|.
+It is available from `nRF Connect for Desktop`_, a cross-platform tool that provides different development applications for the |NCS| and Nordic Semiconductor products.
+Both Toolchain Manager and nRF Connect for Desktop are available for Windows, Linux, and macOS.
+
+.. note::
+    |toolchain_management_ncs_versions|
 
 .. toggle::
-
-   Toolchain Manager is a tool available from `nRF Connect for Desktop`_, a cross-platform tool that provides different applications that simplify installing the |NCS|.
-   Both the tool and the application are available for Windows, Linux, and macOS.
 
    To install the toolchain and the SDK using the Toolchain Manager app, complete the following steps:
 
    1. Install Toolchain Manager:
 
-      a. `Download nRF Connect for Desktop`_ for your operating system.
+      a. Check :ref:`operating system versions that support this tool <additional_nordic_sw_tools>`.
+      #. `Download nRF Connect for Desktop`_ for your operating system.
       #. Install and run the tool on your machine.
       #. In the **APPS** section, click :guilabel:`Install` next to Toolchain Manager.
 
@@ -648,12 +679,20 @@ Legacy installation with Toolchain Manager
             #. Click the dropdown menu for the installed nRF Connect SDK version.
 
                .. figure:: images/gs-assistant_tm_dropdown.png
-                  :alt: The Toolchain Manager dropdown menu for the installed nRF Connect SDK version, cropped
+                  :alt: The Toolchain Manager dropdown menu for the installed nRF Connect SDK version, on Windows
 
-                  The Toolchain Manager dropdown menu options
+                  The Toolchain Manager dropdown menu options (Windows)
 
-            #. Select :guilabel:`Open command prompt`.
+            #. Select the option to open a terminal window:
+
+               * Windows: :guilabel:`Open command prompt`
+               * Linux and macOS: :guilabel:`Open Terminal`
 
             You can then follow the instructions in :ref:`creating_cmd`.
+
+            .. note::
+                You can use the :guilabel:`Generate environment script` button to create a script that lets you switch between different |NCS| versions.
+                After you create the script, rename it and put it in a directory in your system :envvar:`PATH`.
+                This works the same way as the ``--as-script`` flag for nRF Util's `Toolchain Manager command`_ (``nrfutil toolchain-manager env --as-script``).
 
 .. |install_latest_version| replace:: When you first install the |NCS|, it is recommended to install the latest released versions of the SDK and the toolchain.

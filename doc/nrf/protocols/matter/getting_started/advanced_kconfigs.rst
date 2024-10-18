@@ -52,6 +52,18 @@ This is a much faster way than waiting for the subscriber node to notice that th
 
 To enable persistent subscriptions, set the :kconfig:option:`CONFIG_CHIP_PERSISTENT_SUBSCRIPTIONS` Kconfig option.
 
+The time that it takes to re-establish all subscriptions and CASE sessions depends on the number of sessions that can be recovered simultaneously.
+If the number of sessions and subscriptions to recover is greater than the maximum, the device will re-establish as many as possible and schedule re-establishment of the rest after a specified time interval.
+Since the wait interval between the following re-establishment attempts impacts the overall time to recover all device connections, decreasing it can be beneficial for the user experience.
+However, a small interval value will increase device power consumption.
+
+You can configure how many sessions will be re-established concurrently and what will be the subscription resumption retry interval using the following Kconfig options:
+
+* :kconfig:option:`CONFIG_CHIP_MAX_ACTIVE_CASE_CLIENTS` - Sets the maximum number of CASE sessions that can be simultaneously re-established by the end device.
+* :kconfig:option:`CONFIG_CHIP_MAX_ACTIVE_DEVICES` - Sets the maximum number of subscriptions that can be simultaneously re-established by the end device.
+* :kconfig:option:`CONFIG_CHIP_SUBSCRIPTION_RESUMPTION_MIN_RETRY_INTERVAL` - Sets the minimum wait time in seconds before the first resumption retry.
+* :kconfig:option:`CONFIG_CHIP_SUBSCRIPTION_RESUMPTION_RETRY_MULTIPLIER` - Sets the multiplier in seconds that is used to calculate the wait time for the following resumption retries.
+
 .. _ug_matter_configuring_optional_log:
 
 Logging configuration
@@ -86,7 +98,7 @@ See :doc:`matter:nrfconnect_examples_cli` in the Matter documentation for the li
 Matter Settings shell commands
 ------------------------------
 
-You can enable the Matter Settings shell commands to monitor the current usage of the Zephyr Settings NVS.
+You can enable the Matter Settings shell commands to monitor the current usage of the Zephyr Settings using :ref:`NVS (Non-Volatile Storage) <zephyr:nvs_api>` or :ref:`ZMS (Zephyr Memory Storage) <zephyr:zms_api>` backends.
 These commands are useful for verifying that the ``settings`` partition has the proper size and meets the application requirements.
 
 To enable the Matter Settings shell module, set the :kconfig:option:`CONFIG_NCS_SAMPLE_MATTER_SETTINGS_SHELL` Kconfig option to ``y``.
@@ -98,10 +110,6 @@ You can use the following shell commands:
 * ``matter_settings get_size <name>`` - Get the size of the specific entry.
 * ``matter_settings current`` - Get the size of the current settings usage.
 * ``matter_settings free`` - Get the size of the current free settings space.
-
-.. note::
-
-  The Matter Settings shell module is available only for the NVS Zephyr Settings backend.
 
 .. _ug_matter_configuring_device_identification:
 
@@ -171,15 +179,15 @@ To enable one of the reactions to the last fabric removal, set the corresponding
 * :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` - Remove all saved network credentials and reboot the device.
   This option is selected by default.
 
-  When the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_NVS` Kconfig option is also set to ``y``, the device will also remove all non-volatile data stored on the device, including application-specific entries.
+  When the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option is also set to ``y``, the device will also remove all non-volatile data stored on the device, including application-specific entries.
   This means the device is restored to the factory settings.
 
 To create a delay between  the chosen reaction and the last fabric being removed, set the :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ACTION_DELAY` Kconfig option to a specific time in milliseconds.
 By default this Kconfig option is set to 1 second.
 
 .. note::
-  The :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_NVS` Kconfig option is set to ``y`` by default.
-  To disable removing application-specific non-volatile data when the :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` Kconfig option is selected, set the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_NVS` Kconfig option to ``n``.
+  The :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option is set to ``y`` by default.
+  To disable removing application-specific non-volatile data when the :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` Kconfig option is selected, set the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option to ``n``.
 
 .. _ug_matter_configuring_read_client:
 

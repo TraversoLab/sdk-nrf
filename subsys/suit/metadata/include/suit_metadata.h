@@ -20,6 +20,18 @@ typedef int suit_metadata_err_t;
 /**< Content of compared suit_uuid_t structures differs */
 #define METADATA_ERR_COMPARISON_FAILED 1
 
+/**< Format string to print manifest class ID */
+#define SUIT_MANIFEST_CLASS_ID_LOG_FORMAT                                                          \
+	"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x%s"
+
+/**< List of arguments to log manifest class ID */
+#define SUIT_MANIFEST_CLASS_ID_LOG_ARGS(class_id)                                                  \
+	(class_id)->raw[0], (class_id)->raw[1], (class_id)->raw[2], (class_id)->raw[3],            \
+		(class_id)->raw[4], (class_id)->raw[5], (class_id)->raw[6], (class_id)->raw[7],    \
+		(class_id)->raw[8], (class_id)->raw[9], (class_id)->raw[10], (class_id)->raw[11],  \
+		(class_id)->raw[12], (class_id)->raw[13], (class_id)->raw[14],                     \
+		(class_id)->raw[15], suit_manifest_class_name_get(class_id)
+
 /* Define constant values for backward compatibility purposes. */
 typedef enum {
 	/** Digest status value uninitialized (invalid). */
@@ -96,6 +108,21 @@ typedef enum {
 	/** Manifest describes OEM-specific binaries, specific for radio core. */
 	SUIT_MANIFEST_RAD_LOCAL_2 = 0x32,
 } suit_manifest_role_t;
+
+/* Manifest domain nibble. */
+typedef enum {
+	/** Manifest domain uninitialized (invalid). */
+	SUIT_MANIFEST_DOMAIN_UNKNOWN = 0x00,
+
+	/** Manifest domain for Nordic-controlled manifests. */
+	SUIT_MANIFEST_DOMAIN_SEC = 0x10,
+
+	/** Manifest domain for Application-controlled manifests. */
+	SUIT_MANIFEST_DOMAIN_APP = 0x20,
+
+	/** Manifest domain for Radio-controlled manifests. */
+	SUIT_MANIFEST_DOMAIN_RAD = 0x30,
+} suit_manifest_domain_t;
 
 /** The 128-bit UUID, used for identifying vendors as well as classes. */
 typedef struct {
@@ -178,6 +205,22 @@ suit_metadata_err_t suit_metadata_uuid_compare(const suit_uuid_t *uuid1, const s
  */
 suit_metadata_err_t suit_metadata_version_from_array(suit_version_t *version, int32_t *array,
 						     size_t array_len);
+
+/** @brief Get a pointer to the constant string, that describes the manifest role.
+ *
+ * @param[in]  role  Integer value of a manifest role to describe.
+ *
+ * @returns Pointer to the constant string, describing role or empty string for unknown values.
+ */
+const char *suit_role_name_get(suit_manifest_role_t role);
+
+/** @brief Get a pointer to the constant string, that describes the known manifest class ID.
+ *
+ * @param[in]  class_id  Pointer to the manifest class ID value.
+ *
+ * @returns Pointer to the constant string, describing class ID or empty string for unknown classes.
+ */
+const char *suit_manifest_class_name_get(const suit_manifest_class_id_t *class_id);
 
 #ifdef __cplusplus
 }

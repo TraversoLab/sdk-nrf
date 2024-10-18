@@ -9,6 +9,7 @@
 
 #include <modem/lte_lc.h>
 #include <modem/lte_lc_trace.h>
+#include <modem/nrf_modem_lib.h>
 
 #if defined(CONFIG_MODEM_INFO)
 #include <modem/modem_info.h>
@@ -23,6 +24,16 @@
 LOG_MODULE_DECLARE(memfault_ncs_metrics, CONFIG_MEMFAULT_NCS_LOG_LEVEL);
 
 static bool connected;
+static enum lte_lc_func_mode current_func_mode;
+
+static void memfault_on_modem_cfun(int mode, void *ctx)
+{
+	ARG_UNUSED(ctx);
+
+	current_func_mode = mode;
+}
+
+NRF_MODEM_LIB_ON_CFUN(memfault_cfun_hook, memfault_on_modem_cfun, NULL);
 
 #if CONFIG_MEMFAULT_NCS_STACK_METRICS
 static struct memfault_ncs_metrics_thread lte_metrics_thread = {
@@ -54,47 +65,72 @@ static void lte_trace_cb(enum lte_lc_trace_type type)
 	}
 }
 
-static void lte_handler(const struct lte_lc_evt *const evt)
+static void modem_params_get(void)
 {
-	int err;
-
 #if defined(CONFIG_MODEM_INFO)
+	int err;
 	int rsrp;
 	uint8_t band;
 	int snr;
 
 	err = modem_info_get_rsrp(&rsrp);
 	if (err) {
-		LOG_WRN("LTE RSRP value collection failed, error: %d", err);
-	} else {
-		err = MEMFAULT_METRIC_SET_SIGNED(ncs_lte_rsrp_dbm, rsrp);
-		if (err) {
-			LOG_ERR("Failed to set ncs_lte_rsrp_dbm");
-		}
-	};
+		LOG_DBG("Failed to get RSRP");
+		return;
+	}
+
+	err = MEMFAULT_METRIC_SET_SIGNED(ncs_lte_rsrp_dbm, rsrp);
+	if (err) {
+		LOG_ERR("Failed to set ncs_lte_rsrp_dbm");
+		return;
+	}
 
 	err = modem_info_get_current_band(&band);
-	if (err != 0) {
-		LOG_WRN("Network band collection failed, error: %d", err);
-	} else {
-		err = MEMFAULT_METRIC_SET_UNSIGNED(ncs_lte_band, band);
-		if (err) {
-			LOG_ERR("Failed to set nce_lte_band");
-		}
+	if (err) {
+		LOG_DBG("Failed to get band");
+		return;
+	}
+
+	err = MEMFAULT_METRIC_SET_UNSIGNED(ncs_lte_band, band);
+	if (err) {
+		LOG_ERR("Failed to set nce_lte_band");
+		return;
 	}
 
 	err = modem_info_get_snr(&snr);
-	if (err != 0) {
-		LOG_WRN("SNR collection failed, error: %d", err);
-	} else {
-		err = MEMFAULT_METRIC_SET_SIGNED(ncs_lte_snr_decibels, snr);
-		if (err) {
-			LOG_ERR("Failed to set ncs_lte_snr_decibels");
-		}
+	if (err) {
+		LOG_DBG("Failed to get SNR");
+		return;
+	}
+
+	err = MEMFAULT_METRIC_SET_SIGNED(ncs_lte_snr_decibels, snr);
+	if (err) {
+		LOG_ERR("Failed to set ncs_lte_snr_decibels");
+		return;
 	}
 #endif
+}
+
+static void lte_handler(const struct lte_lc_evt *const evt)
+{
+	int err;
+
+	if (current_func_mode == LTE_LC_FUNC_MODE_NORMAL) {
+		modem_params_get();
+	}
 
 	switch (evt->type) {
+	case LTE_LC_EVT_CELL_UPDATE:
+		err = MEMFAULT_METRIC_SET_SIGNED(ncs_lte_cell_id, evt->cell.id);
+		if (err) {
+			LOG_ERR("Failed to set ncs_lte_cell_id");
+		}
+
+		err = MEMFAULT_METRIC_SET_SIGNED(ncs_lte_tracking_area_code, evt->cell.tac);
+		if (err) {
+			LOG_ERR("Failed to set ncs_lte_tracking_area_code");
+		}
+		break;
 	case LTE_LC_EVT_NW_REG_STATUS:
 		switch (evt->nw_reg_status) {
 

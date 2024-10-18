@@ -10,6 +10,9 @@
 
 #include "trace_backend.h"
 
+/* SYS_INIT function */
+int nrf_modem_lib_trace_rtt_channel_alloc(void);
+
 extern struct nrf_modem_lib_trace_backend trace_backend;
 
 #include "cmock_SEGGER_RTT.h"
@@ -37,7 +40,7 @@ static int rtt_allocupbuffer_callback(const char *sName, void *pBuffer, unsigned
 	TEST_ASSERT_EQUAL_CHAR_ARRAY(exp_sName, sName, sizeof(exp_sName));
 	TEST_ASSERT_NOT_EQUAL(NULL, pBuffer);
 	TEST_ASSERT_EQUAL(BACKEND_RTT_BUF_SIZE, BufferSize);
-	TEST_ASSERT_EQUAL(SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL, Flags);
+	TEST_ASSERT_EQUAL(SEGGER_RTT_MODE_NO_BLOCK_TRIM, Flags);
 
 	return trace_rtt_channel;
 }
@@ -51,8 +54,10 @@ void test_trace_backend_init_rtt(void)
 	__cmock_SEGGER_RTT_AllocUpBuffer_ExpectAnyArgsAndReturn(trace_rtt_channel);
 	__cmock_SEGGER_RTT_AllocUpBuffer_AddCallback(&rtt_allocupbuffer_callback);
 
-	ret = trace_backend.init(callback);
+	ret = nrf_modem_lib_trace_rtt_channel_alloc();
+	TEST_ASSERT_EQUAL(0, ret);
 
+	ret = trace_backend.init(callback);
 	TEST_ASSERT_EQUAL(0, ret);
 }
 
@@ -62,6 +67,9 @@ void test_trace_backend_init_rtt_ebusy(void)
 
 	/* Simulate failure by returning negative RTT channel. */
 	__cmock_SEGGER_RTT_AllocUpBuffer_ExpectAnyArgsAndReturn(-1);
+
+	ret = nrf_modem_lib_trace_rtt_channel_alloc();
+	TEST_ASSERT_EQUAL(-EBUSY, ret);
 
 	ret = trace_backend.init(callback);
 	TEST_ASSERT_EQUAL(-EBUSY, ret);

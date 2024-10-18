@@ -34,12 +34,12 @@ static const suit_manifest_class_id_t root_class_id = {{0x97, 0x05, 0x48, 0x23, 
 							0x4b, 0x0a}};
 
 /* Valid root envelope */
-extern const uint8_t manifest_valid_buf[];
-extern const size_t manifest_valid_len;
+extern uint8_t manifest_valid_buf[];
+extern size_t manifest_valid_len;
 
 /* Valid recovery envelope */
-extern const uint8_t manifest_valid_recovery_buf[];
-extern const size_t manifest_valid_recovery_len;
+extern uint8_t manifest_valid_recovery_buf[];
+extern size_t manifest_valid_recovery_len;
 
 static void setup_erased_flash(void)
 {
@@ -138,7 +138,7 @@ static void enter_recovery_mode(void *fixture)
 ZTEST_SUITE(orchestrator_recovery_update_tests, NULL, NULL, enter_recovery_mode,
 	    orchestrator_tests_cleanup, NULL);
 
-ZTEST(orchestrator_recovery_update_tests, test_successful_update)
+ZTEST(orchestrator_recovery_update_tests, test_rec_successful_update)
 {
 	const uint8_t *addr;
 	size_t size;
@@ -169,7 +169,7 @@ ZTEST(orchestrator_recovery_update_tests, test_successful_update)
 	assert_post_recovery_install_state();
 }
 
-ZTEST(orchestrator_recovery_update_tests, test_successful_update_and_boot)
+ZTEST(orchestrator_recovery_update_tests, test_rec_successful_update_and_boot)
 {
 	const uint8_t *addr_boot;
 	size_t size_boot;
@@ -223,7 +223,7 @@ ZTEST(orchestrator_recovery_update_tests, test_successful_update_and_boot)
 		      "Unexpected execution mode after test execution");
 }
 
-ZTEST(orchestrator_recovery_update_tests, test_invalid_exec_mode)
+ZTEST(orchestrator_recovery_update_tests, test_rec_invalid_exec_mode)
 {
 	/* GIVEN suit storage does not indicate presence of update candidate... */
 	setup_erased_flash();
@@ -237,12 +237,12 @@ ZTEST(orchestrator_recovery_update_tests, test_invalid_exec_mode)
 	int err = suit_orchestrator_entry();
 
 	/* THEN orchestrator returns error code... */
-	zassert_equal(-EACCES, err, "Unexpected error code");
+	zassert_equal(-EMSGSIZE, err, "Unexpected error code");
 	/* ... and the candidate availability flag remains cleared */
 	assert_post_recovery_install_state();
 }
 
-ZTEST(orchestrator_recovery_update_tests, test_independent_updates_denied)
+ZTEST(orchestrator_recovery_update_tests, test_rec_independent_updates_denied)
 {
 	/* GIVEN suit storage contains recovery FW update... */
 	setup_update_candidate(manifest_valid_recovery_buf, manifest_valid_recovery_len);

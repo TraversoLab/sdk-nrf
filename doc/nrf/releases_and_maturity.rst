@@ -15,6 +15,7 @@ The versioning scheme adopted is similar to `Semantic versioning`_, but with imp
 To learn more about the versioning and the release criteria of the |NCS|, read :ref:`dm-revisions`.
 
 Each new release comes with its own :ref:`release_notes` and can also change the :ref:`software_maturity` of the existing components.
+Major and minor releases always come with their respective :ref:`migration_guides`.
 
 If an issue is found in a release after it has taken place, those issues are listed on the :ref:`known_issues` page.
 
@@ -26,4 +27,5 @@ If an issue is found in a release after it has taken place, those issues are lis
    releases_and_maturity/migration_guides
    releases_and_maturity/repository_revisions
    releases_and_maturity/software_maturity
+   releases_and_maturity/abi_compatibility
    releases_and_maturity/known_issues

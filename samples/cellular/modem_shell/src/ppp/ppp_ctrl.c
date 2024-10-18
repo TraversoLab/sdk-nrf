@@ -27,8 +27,6 @@
 #include <zephyr/posix/sys/socket.h>
 #include <zephyr/shell/shell.h>
 
-#include <zephyr/settings/settings.h>
-
 #include "link_api.h"
 #include "mosh_print.h"
 
@@ -380,7 +378,8 @@ static int ppp_ctrl_zephyr_sckt_create(void)
 	}
 
 	/* Create raw Zephyr socket for passing data to/from ppp link: */
-	ppp_data_socket_fd = socket(AF_PACKET, SOCK_RAW | SOCK_NATIVE, IPPROTO_RAW);
+	ppp_data_socket_fd = socket(AF_PACKET, SOCK_RAW | SOCK_NATIVE,
+				    htons(IPPROTO_RAW));
 	if (ppp_data_socket_fd < 0) {
 		mosh_error("PPP Zephyr data socket creation failed: (%d)\n", -errno);
 		goto return_error;

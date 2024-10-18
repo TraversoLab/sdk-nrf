@@ -54,6 +54,10 @@
 #include <mock_suit_platform.h>
 #endif /* CONFIG_MOCK_SUIT_PLATFORM */
 
+#ifdef CONFIG_MOCK_SUIT_IPUC
+#include <mock_suit_plat_ipuc.h>
+#endif /* CONFIG_MOCK_SUIT_IPUC */
+
 #ifdef CONFIG_MOCK_DIGEST_SINK
 #include <mock_digest_sink.h>
 #endif /* CONFIG_MOCK_DIGEST_SINK */
@@ -74,13 +78,13 @@
 #include <mock_fetch_source_streamer.h>
 #endif /* CONFIG_MOCK_FETCH_SOURCE_STREAMER */
 
-#ifdef CONFIG_MOCK_SDFW_BUILTIN_KEYS
-#include <mock_sdfw_builtin_keys.h>
-#endif /* CONFIG_MOCK_SDFW_BUILTIN_KEYS */
-
 #ifdef CONFIG_MOCK_SUIT_MEMORY_LAYOUT
 #include <mock_suit_memory_layout.h>
 #endif /* CONFIG_MOCK_SUIT_MEMORY_LAYOUT */
+
+#ifdef CONFIG_MOCK_SUIT_SERVICE
+#include <mock_suit_service.h>
+#endif /* CONFIG_MOCK_SUIT_SERVICE */
 
 static inline void mocks_reset(void)
 {
@@ -128,6 +132,10 @@ static inline void mocks_reset(void)
 	mock_suit_platform_reset();
 #endif /* CONFIG_MOCK_SUIT_PLATFORM */
 
+#ifdef CONFIG_MOCK_SUIT_IPUC
+	mock_suit_plat_ipuc_reset();
+#endif /* CONFIG_MOCK_SUIT_IPUC */
+
 #ifdef CONFIG_MOCK_DIGEST_SINK
 	mock_digest_sink_reset();
 #endif /* CONFIG_MOCK_DIGEST_SINK */
@@ -148,13 +156,12 @@ static inline void mocks_reset(void)
 	mock_fetch_source_streamer_reset();
 #endif /* CONFIG_MOCK_FETCH_SOURCE_STREAMER */
 
-#ifdef CONFIG_MOCK_SDFW_BUILTIN_KEYS
-	mock_sdfw_builtin_keys_reset();
-#endif /* CONFIG_MOCK_SDFW_BUILTIN_KEYS */
-
 #ifdef CONFIG_MOCK_SUIT_MEMORY_LAYOUT
 	mock_suit_memory_layout_reset();
 #endif /* CONFIG_MOCK_SUIT_MEMORY_LAYOUT */
 
+#ifdef CONFIG_MOCK_SUIT_SERVICE
+	mock_suit_service_reset();
+#endif /* CONFIG_MOCK_SUIT_SERVICE */
 }
 #endif /* MOCK_H__ */

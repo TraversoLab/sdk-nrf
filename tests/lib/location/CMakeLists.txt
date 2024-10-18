@@ -17,7 +17,8 @@ cmock_handle(${ZEPHYR_NRF_MODULE_DIR}/include/net/rest_client.h)
 cmock_handle(${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_modem/include/nrf_modem_gnss.h)
 cmock_handle(${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_modem/include/nrf_modem_at.h
 	     FUNC_EXCLUDE ".*nrf_modem_at_printf"
-             FUNC_EXCLUDE ".*nrf_modem_at_scanf")
+             FUNC_EXCLUDE ".*nrf_modem_at_scanf"
+	     WORD_EXCLUDE "__nrf_modem_(printf|scanf)_like\(.*\)")
 
 cmock_handle(${ZEPHYR_NRF_MODULE_DIR}/include/net/nrf_cloud.h
 	     FUNC_EXCLUDE ".*nrf_cloud_obj_shadow_update")
@@ -48,6 +49,7 @@ cmock_handle(${ZEPHYR_BASE}/include/zephyr/net/wifi_mgmt.h
 	     FUNC_EXCLUDE "offsetof")
 cmock_handle(${ZEPHYR_BASE}/include/zephyr/device.h
 	     FUNC_EXCLUDE ".*DEVICE_DT_NAME_GET"
+	     FUNC_EXCLUDE ".*device_get_dt_nodelabels"
 	     WORD_EXCLUDE ".*device_visitor_callback_t.*")
 
 zephyr_include_directories(${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_modem/include)

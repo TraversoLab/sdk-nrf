@@ -25,11 +25,9 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/reboot.h>
-
 #if defined(CONFIG_BOOTLOADER_MCUBOOT)
 #include <zephyr/dfu/mcuboot.h>
 #endif
-
 #if defined(CONFIG_NRF_MODEM_LIB)
 #include <modem/nrf_modem_lib.h>
 #include <nrf_modem.h>
@@ -67,6 +65,7 @@ static int save_validate_status(const char *const job_id,
 			   const enum nrf_cloud_fota_validate_status status);
 static int publish_validated_job_status(void);
 static void reset_topics(void);
+static void install_smp_update(struct nrf_cloud_fota_job *fota);
 
 static struct mqtt_client *client_mqtt;
 static nrf_cloud_fota_callback_t event_cb;
@@ -142,6 +141,10 @@ static void send_fota_done_event_if_done(void)
 	 */
 	if ((current_fota.status == NRF_CLOUD_FOTA_IN_PROGRESS) &&
 	    (saved_job.validate == NRF_CLOUD_FOTA_VALIDATE_PENDING)) {
+		/* SMP updates can be installed immediately */
+		if (current_fota.info.type == NRF_CLOUD_FOTA_SMP) {
+			install_smp_update(&current_fota);
+		}
 		send_event(NRF_CLOUD_FOTA_EVT_DONE, &current_fota);
 	}
 }
@@ -157,7 +160,7 @@ static int pending_fota_job_validate(void)
 	}
 
 	/* Do not enforce a reboot for modem updates since they can also be handled by
-	 * reinitializing the modem lib
+	 * reinitializing the modem lib.
 	 */
 	if (!nrf_cloud_fota_is_type_modem(saved_job.type)) {
 		reboot_on_init = reboot;
@@ -211,7 +214,7 @@ static void fota_reboot(void)
 	sys_reboot(SYS_REBOOT_COLD);
 }
 
-int nrf_cloud_fota_init(nrf_cloud_fota_callback_t cb)
+int nrf_cloud_fota_init(struct nrf_cloud_fota_init_param const *const init)
 {
 	int ret;
 
@@ -219,12 +222,19 @@ int nrf_cloud_fota_init(nrf_cloud_fota_callback_t cb)
 		fota_reboot();
 	}
 
-	if (cb == NULL) {
+	if (init == NULL) {
 		LOG_ERR("Invalid parameter");
 		return -EINVAL;
 	}
 
-	event_cb = cb;
+	event_cb = init->evt_cb;
+
+	if (IS_ENABLED(CONFIG_NRF_CLOUD_FOTA_SMP)) {
+		ret = nrf_cloud_fota_smp_client_init(init->smp_reset_cb);
+		if (ret) {
+			return ret;
+		}
+	}
 
 	if (initialized) {
 		return 0;
@@ -239,6 +249,7 @@ int nrf_cloud_fota_init(nrf_cloud_fota_callback_t cb)
 			LOG_ERR("fota_download_init error: %d", ret);
 			return ret;
 		}
+
 		fota_dl_initialized = true;
 	}
 
@@ -255,13 +266,14 @@ int nrf_cloud_fota_init(nrf_cloud_fota_callback_t cb)
 		/* Indicate that a FOTA update has occurred */
 		ret = 1;
 	} else if (ret == -ENODEV) {
-		/* No job was pending validation, check for already validated modem job */
-		if (nrf_cloud_fota_is_type_modem(saved_job.type) &&
-		    (saved_job.validate == NRF_CLOUD_FOTA_VALIDATE_PASS ||
+		/* No job was pending validation, check for already validated job */
+		if ((saved_job.validate == NRF_CLOUD_FOTA_VALIDATE_PASS ||
 		     saved_job.validate == NRF_CLOUD_FOTA_VALIDATE_FAIL ||
 		     saved_job.validate == NRF_CLOUD_FOTA_VALIDATE_UNKNOWN)) {
-			/* Device has just rebooted from a modem FOTA */
-			LOG_INF("FOTA updated modem");
+			if (nrf_cloud_fota_is_type_modem(saved_job.type)) {
+				/* Device has just rebooted from a modem FOTA */
+				LOG_INF("FOTA updated modem");
+			}
 			ret = 1;
 		} else {
 			ret = 0;
@@ -621,6 +633,24 @@ static int save_validate_status(const char *const job_id,
 	return ret;
 }
 
+static void install_smp_update(struct nrf_cloud_fota_job *fota)
+{
+	/* TODO: after installation, read the version number.
+	 * This does not work for some reason.
+	 * There seems to be some sort of crash/error in dfu_target_smp_image_list_get()
+	 * when called after image installation.
+	 * For now, just use the standard FOTA flow: reboot and then read the version on startup.
+	 */
+	int ret = pending_fota_job_validate();
+
+	if (ret < 0) {
+		current_fota.status = NRF_CLOUD_FOTA_FAILED;
+		current_fota.error = NRF_CLOUD_FOTA_ERROR_APPLY_FAIL;
+	} else {
+		current_fota.status = NRF_CLOUD_FOTA_SUCCEEDED;
+	}
+}
+
 static void http_fota_handler(const struct fota_download_evt *evt)
 {
 	__ASSERT_NO_MSG(evt != NULL);
@@ -648,7 +678,9 @@ static void http_fota_handler(const struct fota_download_evt *evt)
 		save_validate_status(current_fota.info.id,
 				     current_fota.info.type,
 				     NRF_CLOUD_FOTA_VALIDATE_PENDING);
+
 		ret = publish_job_status(&current_fota);
+
 		break;
 
 	case FOTA_DOWNLOAD_EVT_ERASE_PENDING:
@@ -795,7 +827,7 @@ int nrf_cloud_fota_job_start(void)
 static int start_job(struct nrf_cloud_fota_job *const job, const bool send_evt)
 {
 	__ASSERT_NO_MSG(job != NULL);
-	static const int sec_tag = CONFIG_NRF_CLOUD_SEC_TAG;
+	static int sec_tag;
 	int ret = 0;
 
 	enum dfu_target_image_type img_type;
@@ -816,6 +848,14 @@ static int start_job(struct nrf_cloud_fota_job *const job, const bool send_evt)
 			ret = -EFTYPE;
 		}
 		break;
+	case NRF_CLOUD_FOTA_SMP:
+		if (IS_ENABLED(CONFIG_NRF_CLOUD_FOTA_SMP)) {
+			img_type = DFU_TARGET_IMAGE_TYPE_SMP;
+		} else {
+			LOG_ERR("Not configured for SMP FOTA");
+			ret = -EFTYPE;
+		}
+		break;
 	default:
 		LOG_ERR("Unhandled FOTA type: %d", job->info.type);
 		ret = -EFTYPE;
@@ -827,6 +867,8 @@ static int start_job(struct nrf_cloud_fota_job *const job, const bool send_evt)
 		return ret;
 	}
 
+	sec_tag = nrf_cloud_sec_tag_get();
+
 	struct nrf_cloud_download_data dl = {
 		.type = NRF_CLOUD_DL_TYPE_FOTA,
 		.host = job->info.host,
@@ -837,7 +879,11 @@ static int start_job(struct nrf_cloud_fota_job *const job, const bool send_evt)
 			.pdn_id = 0,
 			.frag_size_override = CONFIG_NRF_CLOUD_FOTA_DOWNLOAD_FRAGMENT_SIZE,
 		},
-		.fota = { .expected_type = img_type }
+		.fota = {
+			.expected_type = img_type,
+			.img_sz = job->info.file_size,
+			.cb = (void *)http_fota_handler
+		}
 	};
 
 	ret = nrf_cloud_download_start(&dl);

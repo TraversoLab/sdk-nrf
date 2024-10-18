@@ -195,21 +195,22 @@ static void on_pdn_activated(void)
 #if CONFIG_NET_IPV4
 	int ret;
 
+	/* If IPv4 is enabled, check whether modem has been assigned an IPv4. */
 	ret = lte_ipv4_addr_add(iface_bound);
+
 	if (ret == -ENODATA) {
 		LOG_WRN("No IPv4 address given by the network");
-		return;
 	} else if (ret) {
 		LOG_ERR("ipv4_addr_add, error: %d", ret);
 		fatal_error_notify_and_disconnect();
 		return;
 	}
 
-	update_has_pdn(true);
-
 #endif /* CONFIG_NET_IPV4 */
 
 	/* IPv6 is updated on a aseparate event */
+
+	update_has_pdn(true);
 }
 
 static void on_pdn_deactivated(void)
@@ -248,8 +249,6 @@ static void on_pdn_ipv6_up(void)
 		fatal_error_notify_and_disconnect();
 		return;
 	}
-
-	update_has_pdn(true);
 }
 
 static void on_pdn_ipv6_down(void)
@@ -296,6 +295,9 @@ static void pdn_event_handler(uint8_t cid, enum pdn_event event, int reason)
 		on_pdn_ipv6_down();
 		break;
 #endif /* CONFIG_NET_IPV6 */
+	case PDN_EVENT_CTX_DESTROYED:
+		LOG_DBG("PDN context destroyed");
+		break;
 	default:
 		LOG_ERR("Unexpected PDN event: %d", event);
 		break;
@@ -325,6 +327,9 @@ static void lte_reg_handler(const struct lte_lc_evt *const evt)
 			 * an unregistered status).
 			 */
 			break;
+		case LTE_LC_NW_REG_UICC_FAIL:
+			LOG_WRN("The modem reports a UICC failure. Is SIM installed?");
+			__fallthrough;
 		default:
 			LOG_DBG("Not registered to serving cell");
 			/* Mark the serving cell as lost. */
@@ -413,6 +418,11 @@ static int lte_net_if_connect(struct conn_mgr_conn_binding *const if_conn)
 		return ret;
 	}
 
+	ret = lte_lc_modem_events_enable();
+	if (ret) {
+		LOG_WRN("lte_lc_modem_events_enable, error: %d", ret);
+	}
+
 	connection_timeout_schedule();
 
 	return 0;
@@ -438,7 +448,7 @@ static int lte_net_if_disconnect(struct conn_mgr_conn_binding *const if_conn)
 }
 
 /* Bind connectity APIs.
- * extern in nrf91_sockets.c
+ * extern in nrf9x_sockets.c
  */
 struct conn_mgr_conn_api lte_net_if_conn_mgr_api = {
 	.init = lte_net_if_init,

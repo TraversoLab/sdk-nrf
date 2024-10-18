@@ -22,7 +22,6 @@ extern "C" {
 
 /** @defgroup esb Enhanced ShockBurst
  * @{
- * @ingroup proprietary_api
  *
  * @brief Enhanced ShockBurst (ESB) is a basic protocol that supports two-way
  *        data packet communication including packet buffering, packet
@@ -127,6 +126,11 @@ enum esb_bitrate {
 	/** 4 Mb radio mode. */
 	ESB_BITRATE_4MBPS = NRF_RADIO_MODE_NRF_4MBIT_H_0_5,
 #endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) */
+
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	/** 4 Mb radio mode. */
+	ESB_BITRATE_4MBPS = RADIO_MODE_MODE_Nrf_4Mbit_0BT6,
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
 };
 
 /** @brief Enhanced ShockBurst CRC modes. */

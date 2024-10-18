@@ -9,12 +9,17 @@
 #include <modem/nrf_modem_lib.h>
 #include <zephyr/logging/log.h>
 
+#include "lte_lc_helpers.h"
+
 LOG_MODULE_DECLARE(lte_lc, CONFIG_LTE_LINK_CONTROL_LOG_LEVEL);
 
+#if defined(CONFIG_UNITY)
+void on_modem_init(int err, void *ctx)
+#else
 NRF_MODEM_LIB_ON_INIT(lte_lc_init_hook, on_modem_init, NULL);
-NRF_MODEM_LIB_ON_SHUTDOWN(lte_lc_shutdown_hook, on_modem_shutdown, NULL);
 
 static void on_modem_init(int err, void *ctx)
+#endif
 {
 	extern const enum lte_lc_system_mode lte_lc_sys_mode;
 	extern const enum lte_lc_system_mode_preference lte_lc_sys_mode_pref;
@@ -76,6 +81,14 @@ static void on_modem_init(int err, void *ctx)
 		(void)lte_lc_proprietary_psm_req(false);
 	}
 
+	/* Only supported in mfw 2.0.1 and newer.
+	 * Ignore the return value; an error likely means that the feature
+	 * is not supported. This optimization was enabled by default in firmware v2.0.0,
+	 * so that should not be a problem.
+	 */
+	(void)nrf_modem_at_printf("AT%%FEACONF=0,3,%d",
+		IS_ENABLED(CONFIG_LTE_PLMN_SELECTION_OPTIMIZATION));
+
 	err = lte_lc_edrx_req(IS_ENABLED(CONFIG_LTE_EDRX_REQ));
 	if (err) {
 		LOG_ERR("Failed to configure eDRX, err %d", err);
@@ -103,8 +116,7 @@ static void on_modem_init(int err, void *ctx)
 		return;
 	}
 #elif defined(CONFIG_LTE_UNLOCK_PLMN)
-	/* Automatically select Operator (volatile setting).
-	 */
+	/* Automatically select Operator (volatile setting). */
 	err = nrf_modem_at_printf("AT+COPS=0");
 	if (err) {
 		LOG_ERR("Failed to unlock PLMN, err %d", err);
@@ -113,19 +125,7 @@ static void on_modem_init(int err, void *ctx)
 #endif
 
 	/* Configure Release Assistance Indication (RAI). */
-	err = nrf_modem_at_printf("AT%%RAI=%d", IS_ENABLED(CONFIG_LTE_RAI_REQ) ? 1 : 0);
-	if (err) {
-		LOG_ERR("Failed to configure RAI, err %d", err);
-		return;
-	}
-}
-
-static void on_modem_shutdown(void *ctx)
-{
-	/* Make sure the Modem library was in normal mode and not in bootloader mode. */
-	if (nrf_modem_is_initialized()) {
-		(void)lte_lc_power_off();
-	}
+	rai_set();
 }
 
 #if defined(CONFIG_UNITY)

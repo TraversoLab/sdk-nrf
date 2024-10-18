@@ -16,6 +16,7 @@
 #include <net/nrf_cloud_coap.h>
 #include "fota_support_coap.h"
 #endif
+#include <net/nrf_provisioning.h>
 
 #include "cloud_connection.h"
 #include "provisioning_support.h"
@@ -37,7 +38,9 @@ LOG_MODULE_REGISTER(cloud_connection, CONFIG_MULTI_SERVICE_LOG_LEVEL);
 static K_EVENT_DEFINE(cloud_events);
 
 /* Atomic status flag tracking whether an initial association is in progress. */
-atomic_t initial_association;
+static atomic_t initial_association;
+static bool device_deleted;
+static int reconnect_seconds = CONFIG_CLOUD_CONNECTION_RETRY_TIMEOUT_SECONDS;
 
 /* Helper functions for pending on pendable events. */
 bool await_network_ready(k_timeout_t timeout)
@@ -58,6 +61,11 @@ bool await_cloud_disconnected(k_timeout_t timeout)
 bool await_date_time_known(k_timeout_t timeout)
 {
 	return k_event_wait(&cloud_events, DATE_TIME_KNOWN, false, timeout) != 0;
+}
+
+bool is_device_deleted(void)
+{
+	return device_deleted;
 }
 
 /* Wait for a connection result, and return true if connection was successful within the timeout,
@@ -89,12 +97,12 @@ static void ready_timeout_work_fn(struct k_work *work)
 
 static K_WORK_DELAYABLE_DEFINE(ready_timeout_work, ready_timeout_work_fn);
 
-
 /* Start the readiness timeout if readiness is not already achieved. */
 static void start_readiness_timeout(void)
 {
 	/* It doesn't make sense to start the readiness timeout if we're already ready. */
-	if (!k_event_test(&cloud_events, CLOUD_READY)) {
+	if (k_event_test(&cloud_events, CLOUD_READY)) {
+		LOG_DBG("Already ready.");
 		return;
 	}
 
@@ -131,8 +139,17 @@ static void cloud_ready(void)
 	/* Clear the readiness timeout, since we have become ready. */
 	clear_readiness_timeout();
 
+	reconnect_seconds = CONFIG_CLOUD_CONNECTION_RETRY_TIMEOUT_SECONDS;
+
 	/* Notify that the nRF Cloud connection is ready for use. */
 	k_event_post(&cloud_events, CLOUD_READY);
+	LOG_DBG("Setting CLOUD_READY");
+
+	if (IS_ENABLED(CONFIG_NRF_PROVISIONING)) {
+		LOG_INF("Reducing provisioning check interval to %d minutes",
+			CONFIG_POST_PROVISIONING_INTERVAL_M);
+		nrf_provisioning_set_interval(CONFIG_POST_PROVISIONING_INTERVAL_M * SEC_PER_MIN);
+	}
 }
 
 /* A callback that the application may register in order to handle custom device messages.
@@ -161,6 +178,7 @@ void disconnect_cloud(void)
 
 	/* Clear the Ready and Connected events, no longer accurate. */
 	k_event_clear(&cloud_events, CLOUD_READY | CLOUD_CONNECTED);
+	LOG_DBG("Cleared CLOUD_READY and CLOUD_CONNECTED");
 
 	/* Clear the initial association flag, no longer accurate. */
 	atomic_set(&initial_association, false);
@@ -237,17 +255,9 @@ void cloud_transport_error_detected(void)
  */
 static bool connect_cloud(void)
 {
-	char device_id[NRF_CLOUD_CLIENT_ID_MAX_LEN + 1];
 	int err;
 
 	LOG_INF("Connecting to nRF Cloud");
-
-	err = nrf_cloud_client_id_get(device_id, sizeof(device_id));
-	if (!err) {
-		LOG_INF("Device ID: %s", device_id);
-	} else {
-		LOG_ERR("Error requesting the device id: %d", err);
-	}
 
 	/* Clear the disconnected flag, no longer accurate. */
 	k_event_clear(&cloud_events, CLOUD_DISCONNECTED);
@@ -442,12 +452,13 @@ static void cloud_event_handler(const struct nrf_cloud_evt *nrf_cloud_evt)
 		 * If this is an initial association, the device must disconnect and
 		 * and reconnect before using nRF Cloud.
 		 */
-
+		device_deleted = false;
 		if (atomic_get(&initial_association)) {
 			/* Disconnect as is required.
 			 * The connection loop will handle reconnection afterwards.
 			 */
 			LOG_INF("Device successfully associated with cloud! Reconnecting");
+			reconnect_seconds = 1;
 			disconnect_cloud();
 		}
 		break;
@@ -461,7 +472,6 @@ static void cloud_event_handler(const struct nrf_cloud_evt *nrf_cloud_evt)
 		 * device's shadow based on the build configuration.
 		 * See config NRF_CLOUD_SEND_SHADOW_INFO for details.
 		 */
-
 		break;
 	case NRF_CLOUD_EVT_SENSOR_DATA_ACK:
 		LOG_DBG("NRF_CLOUD_EVT_SENSOR_DATA_ACK");
@@ -482,7 +492,6 @@ static void cloud_event_handler(const struct nrf_cloud_evt *nrf_cloud_evt)
 	case NRF_CLOUD_EVT_RX_DATA_GENERAL:
 		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_GENERAL");
 		LOG_DBG("%d bytes received from cloud", nrf_cloud_evt->data.len);
-
 		/* Pass the device message along to the application, if it is listening */
 		if (general_dev_msg_handler) {
 			/* To keep the sample simple, we invoke the callback directly.
@@ -493,6 +502,11 @@ static void cloud_event_handler(const struct nrf_cloud_evt *nrf_cloud_evt)
 			general_dev_msg_handler(&nrf_cloud_evt->data);
 		}
 
+		break;
+	case NRF_CLOUD_EVT_RX_DATA_DISCON:
+		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_DISCON");
+		LOG_INF("Device was removed from your account.");
+		device_deleted = true;
 		break;
 	case NRF_CLOUD_EVT_RX_DATA_SHADOW: {
 		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_SHADOW");
@@ -607,10 +621,22 @@ static void check_credentials(void)
 			LOG_WRN("nRF Cloud credentials are not installed. "
 				"Please install and reboot.");
 		}
-		k_sleep(K_FOREVER);
-	} else if (status) {
-		LOG_ERR("Error while checking for credentials: %d. Proceeding anyway.", status);
+	} else if (status == -ENOPROTOOPT) {
+		LOG_WRN("Required root CA certificate is missing.");
+	} else {
+		if (status) {
+			LOG_ERR("Error while checking for credentials: %d. Proceeding anyway.",
+				status);
+		}
+		return;
 	}
+	if (!IS_ENABLED(CONFIG_NRF_PROVISIONING)) {
+		/* Save power since credentials will not work, and we are not using the
+		 * cloud-based nrf_provisioning service.
+		 */
+		conn_mgr_all_if_down(true);
+	}
+	k_sleep(K_FOREVER);
 }
 
 void cloud_connection_thread_fn(void)
@@ -668,9 +694,9 @@ void cloud_connection_thread_fn(void)
 			LOG_INF("Disconnected from nRF Cloud");
 		}
 
-		LOG_INF("Retrying in %d seconds...", CONFIG_CLOUD_CONNECTION_RETRY_TIMEOUT_SECONDS);
+		LOG_INF("Retrying in %d seconds...", reconnect_seconds);
 
 		/* Wait a bit before trying again. */
-		k_sleep(K_SECONDS(CONFIG_CLOUD_CONNECTION_RETRY_TIMEOUT_SECONDS));
+		k_sleep(K_SECONDS(reconnect_seconds));
 	}
 }

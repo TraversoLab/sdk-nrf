@@ -80,7 +80,11 @@ config BT_SCAN
 
 # Configure how many Bluetooth LE devices the Matter bridge can support (the final number is given value - 1, as 1 connection is used for the Matter Bluetooth LE service).
 config BT_MAX_CONN
-	default 3
+	default 10
+
+# Set ACL RX count to CONFIG_BT_MAX_CONN + 1, as it is expected that CONFIG_BT_BUF_ACL_RX_COUNT > CONFIG_BT_MAX_CONN.
+config BT_BUF_ACL_RX_COUNT
+	default 11
 
 config BT_SCAN_FILTER_ENABLE
 	default y
@@ -111,7 +115,7 @@ config BT_SETTINGS
 
 # Configure how many Bluetooth LE devices will be paired with Matter bridge. Assuming it will be only bridged devices, it should be set to BT_MAX_CONN - 1.
 config BT_MAX_PAIRED
-	default 2
+	default 9
 
 # Use two Bluetooth LE identities. The first one is used by the peripheral for Matter service advertising purposes, and the other is used by the Matter bridge central.
 config BT_ID_MAX
@@ -158,6 +162,23 @@ config CHIP_ENABLE_READ_CLIENT
 
 config NCS_SAMPLE_MATTER_PERSISTENT_STORAGE
 	default y
+
+config BRIDGE_SMART_PLUG_SUPPORT
+	bool "Enables additional endpoint implementing Matter smart plug functionality"
+	default n
+
+# Sample configuration used for Thread networking
+if NET_L2_OPENTHREAD
+
+choice OPENTHREAD_NORDIC_LIBRARY_CONFIGURATION
+	default OPENTHREAD_NORDIC_LIBRARY_FTD
+endchoice
+
+choice OPENTHREAD_DEVICE_TYPE
+	default OPENTHREAD_FTD
+endchoice
+
+endif # NET_L2_OPENTHREAD
 
 source "${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/nrfconnect/chip-module/Kconfig.features"
 source "${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/nrfconnect/chip-module/Kconfig.defaults"

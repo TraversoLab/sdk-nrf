@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#undef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L /* Required for gmtime_r */
+
 #include <date_time.h>
 #include <zephyr/logging/log.h>
 #include <modem/at_monitor.h>
@@ -39,6 +42,12 @@ static date_time_evt_handler_t app_evt_handler;
 /* In units of quarters of hours, same as used by AT+CCLK. */
 static int date_time_tz = DATE_TIME_TZ_INVALID;
 
+/* Whether or not an already-scheduled update is blocking reschedules. */
+static atomic_t reschedule_blocked;
+
+/* Number of consecutive retries that have been attempted so far */
+static atomic_t retry_count;
+
 static void date_time_core_notify_event(enum date_time_evt_type time_source)
 {
 	static struct date_time_evt evt;
@@ -50,30 +59,63 @@ static void date_time_core_notify_event(enum date_time_evt_type time_source)
 
 	if (app_evt_handler != NULL) {
 		app_evt_handler(&evt);
+	} else {
+		LOG_DBG("No date-time event handler registered");
 	}
 }
 
-static void date_time_core_schedule_update(bool check_pending)
+static int date_time_core_schedule_work(int interval)
 {
-	/* (Re-)schedule time update work
-	 * if periodic updates are requested in the configuration.
-	 */
-	if (CONFIG_DATE_TIME_UPDATE_INTERVAL_SECONDS > 0) {
-		/* Don't reschedule time update work in some cases,
-		 * e.g. if time is not obtained and the work is already pending.
-		 */
-		if (check_pending && k_work_delayable_is_pending(&date_time_update_work)) {
-			return;
-		}
+	if (!IS_ENABLED(CONFIG_DATE_TIME_MODEM) && !IS_ENABLED(CONFIG_DATE_TIME_NTP)) {
+		LOG_DBG("Skipping requested date time update, modem and NTP are disabled");
+		return -ENOTSUP;
+	}
 
+	/* If a scheduled update is blocking reschedules, exit.
+	 * Otherwise set the reschedule_blocked flag to true, then proceed with the reschedule.
+	 */
+
+	if (atomic_set(&reschedule_blocked, true)) {
+		LOG_DBG("Requested date-time update not scheduled, another is already scheduled");
+		return -EAGAIN;
+	}
+
+	k_work_reschedule_for_queue(&date_time_work_q, &date_time_update_work, K_SECONDS(interval));
+
+	return 0;
+}
+
+static void date_time_core_schedule_update(void)
+{
+	if (CONFIG_DATE_TIME_UPDATE_INTERVAL_SECONDS <= 0) {
+		LOG_DBG("Skipping requested date time update, periodic requests are not enabled");
+		return;
+	}
+
+	/* Reset the retry counter since this will be a normal update. */
+	atomic_set(&retry_count, 0);
+
+	if (date_time_core_schedule_work(CONFIG_DATE_TIME_UPDATE_INTERVAL_SECONDS) == 0) {
 		LOG_DBG("New periodic date time update in: %d seconds",
 			CONFIG_DATE_TIME_UPDATE_INTERVAL_SECONDS);
-
-		k_work_reschedule_for_queue(
-			&date_time_work_q,
-			&date_time_update_work,
-			K_SECONDS(CONFIG_DATE_TIME_UPDATE_INTERVAL_SECONDS));
 	}
+}
+
+static void date_time_core_schedule_retry(void)
+{
+	/* If this is the last allowable retry, or retries are not enabled
+	 * (CONFIG_DATE_TIME_RETRY_COUNT==0), switch to performing a normal update.
+	 */
+	if (atomic_inc(&retry_count) >= CONFIG_DATE_TIME_RETRY_COUNT) {
+		date_time_core_schedule_update();
+		return;
+	}
+
+	/* Scheduling new update cannot fail because we are never doing retries
+	 * if we have fresh enough time
+	 */
+	date_time_core_schedule_work(CONFIG_DATE_TIME_RETRY_INTERVAL_SECONDS);
+	LOG_DBG("Date time update retry in: %d seconds", CONFIG_DATE_TIME_RETRY_INTERVAL_SECONDS);
 }
 
 static void date_time_update_work_fn(struct k_work *work)
@@ -85,10 +127,17 @@ static void date_time_update_work_fn(struct k_work *work)
 	err = date_time_core_current_check();
 	if (err == 0) {
 		LOG_DBG("Using previously obtained time");
-		date_time_core_schedule_update(true);
+		date_time_core_schedule_update();
 		date_time_core_notify_event(DATE_TIME_EVT_TYPE_PREVIOUS);
 		return;
 	}
+
+	/* Unblock update reschedules since we are now performing an update.
+	 * There may still be a scheduled update beyond this one (for example if this was invoked
+	 * by date_time_core_update_async), but it will be overridden when this update triggers a
+	 * reschedule.
+	 */
+	atomic_clear(&reschedule_blocked);
 
 #if defined(CONFIG_DATE_TIME_MODEM)
 	LOG_DBG("Getting time from cellular network");
@@ -113,7 +162,8 @@ static void date_time_update_work_fn(struct k_work *work)
 #endif
 	LOG_DBG("Did not get time from any time source");
 
-	date_time_core_schedule_update(true);
+	/* If CONFIG_DATE_TIME_RETRY_COUNT is set to 0, this will turn into a normal update. */
+	date_time_core_schedule_retry();
 	date_time_core_notify_event(DATE_TIME_NOT_OBTAINED);
 }
 
@@ -127,6 +177,8 @@ void date_time_lte_ind_handler(const struct lte_lc_evt *const evt)
 		case LTE_LC_NW_REG_REGISTERED_HOME:
 		case LTE_LC_NW_REG_REGISTERED_ROAMING:
 			if (!date_time_is_valid()) {
+				LOG_DBG("Date time update scheduled in 1 second "
+					"due to LTE registration");
 				k_work_reschedule_for_queue(
 					&date_time_work_q,
 					&date_time_update_work,
@@ -161,7 +213,7 @@ void date_time_core_init(void)
 	}
 
 	if (!IS_ENABLED(CONFIG_DATE_TIME_AUTO_UPDATE)) {
-		date_time_core_schedule_update(false);
+		date_time_core_schedule_update();
 	}
 }
 
@@ -199,6 +251,8 @@ int date_time_core_now_local(int64_t *local_time_ms)
 
 int date_time_core_update_async(date_time_evt_handler_t evt_handler)
 {
+	LOG_DBG("Requesting date-time update asynchronously");
+
 	if (evt_handler) {
 		app_evt_handler = evt_handler;
 	} else if (app_evt_handler == NULL) {
@@ -278,7 +332,10 @@ void date_time_core_store_tz(int64_t curr_time_ms, enum date_time_evt_type time_
 
 	date_time_tz = tz;
 
-	date_time_core_schedule_update(false);
+	date_time_core_schedule_update();
+
+	/* Reset the retry counter since we have successfully acquired a time. */
+	atomic_set(&retry_count, 0);
 
 	tp.tv_sec = curr_time_ms / 1000;
 	tp.tv_nsec = (curr_time_ms % 1000) * 1000000;

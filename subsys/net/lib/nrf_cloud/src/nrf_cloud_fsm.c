@@ -7,6 +7,7 @@
 #include "nrf_cloud_fsm.h"
 #include "nrf_cloud_codec_internal.h"
 #include "nrf_cloud_mem.h"
+#include "nrf_cloud_transport.h"
 #include <zephyr/kernel.h>
 #include <net/nrf_cloud_alert.h>
 #include <net/nrf_cloud_codec.h>
@@ -107,6 +108,7 @@ static const fsm_transition *state_event_handlers[] = {
 BUILD_ASSERT(ARRAY_SIZE(state_event_handlers) == STATE_TOTAL);
 
 static bool persistent_session;
+static bool jitp_association_wait;
 
 /* Flag to track if the c2d topic was modified; if so, the desired section
  * in the shadow needs to be updated to prevent delta events.
@@ -169,20 +171,34 @@ static int state_ua_pin_wait(void)
 		.message_id = NCT_MSG_ID_STATE_REPORT,
 	};
 
-	/* Update the shadow for the current state: STATE_UA_PIN_WAIT */
-	err = nrf_cloud_state_encode(STATE_UA_PIN_WAIT, false, false, &msg.data);
-	if (err) {
-		LOG_ERR("nrf_cloud_state_encode failed %d", err);
-		return err;
+	/* Prevent duplicate application notifications of user association request
+	 * events. They are unnecessary and caused by various background shadow
+	 * updates.
+	 */
+	if (!jitp_association_wait) {
+		jitp_association_wait = true;
+		add_shadow_info = IS_ENABLED(CONFIG_NRF_CLOUD_SEND_SHADOW_INFO);
+		(void)nct_save_session_state(false);
+		(void)nct_set_keepalive(CONFIG_NRF_CLOUD_MQTT_UA_WAIT_KEEPALIVE);
+	} else {
+		LOG_DBG("Ignoring duplicate STATE_UA_PIN_WAIT");
+		return 0;
 	}
 
-	err = nct_cc_send(&msg);
-
-	nrf_cloud_free((void *)msg.data.ptr);
-
-	if (err) {
-		LOG_ERR("nct_cc_send failed %d", err);
+	/* Update the shadow for the current state: STATE_UA_PIN_WAIT */
+	err = nrf_cloud_state_encode(STATE_UA_PIN_WAIT, false, false, &msg.data);
+	if (err < 0) {
+		LOG_ERR("nrf_cloud_state_encode failed %d", err);
 		return err;
+	} else if (err == 0) {
+		err = nct_cc_send(&msg);
+
+		nrf_cloud_free((void *)msg.data.ptr);
+
+		if (err) {
+			LOG_ERR("nct_cc_send failed %d", err);
+			return err;
+		}
 	}
 
 	struct nrf_cloud_evt evt = {
@@ -210,8 +226,11 @@ static int state_ua_pin_complete(void)
 	}
 
 	add_shadow_info = false;
-
 	c2d_topic_modified = false;
+	if (jitp_association_wait) {
+		jitp_association_wait = false;
+		(void)nct_set_keepalive(CONFIG_NRF_CLOUD_MQTT_KEEPALIVE);
+	}
 
 	err = nct_cc_send(&msg);
 
@@ -339,11 +358,7 @@ static int cc_connection_handler(const struct nct_evt *nct_evt)
 static int set_endpoint_data(const struct nrf_cloud_obj_shadow_data *const input)
 {
 	int err;
-	struct nrf_cloud_data rx;
-	struct nrf_cloud_data tx;
-	struct nrf_cloud_data bulk;
-	struct nrf_cloud_data bin;
-	struct nrf_cloud_data endpoint;
+	struct nct_dc_endpoints eps;
 	struct nrf_cloud_obj *desired_obj = NULL;
 
 	if (input->type == NRF_CLOUD_OBJ_SHADOW_TYPE_ACCEPTED) {
@@ -354,23 +369,28 @@ static int set_endpoint_data(const struct nrf_cloud_obj_shadow_data *const input
 		return -ENOTSUP;
 	}
 
-	err = nrf_cloud_obj_endpoint_decode(desired_obj, &tx, &rx, &bulk, &bin, &endpoint);
+	err = nrf_cloud_obj_endpoint_decode(desired_obj, &eps);
 	if (err) {
 		LOG_ERR("nrf_cloud_obj_endpoint_decode failed %d", err);
 		return err;
 	}
 
 	/* Update to use wildcard topic if necessary */
-	c2d_topic_modified = nrf_cloud_set_wildcard_c2d_topic((char *)rx.ptr, rx.len);
+	c2d_topic_modified = nrf_cloud_set_wildcard_c2d_topic((char *)eps.e[DC_RX].utf8,
+							      eps.e[DC_RX].size);
 
 	/* Set the endpoint information. */
-	nct_dc_endpoint_set(&tx, &rx, &bulk, &bin, &endpoint);
+	nct_dc_endpoint_set(&eps);
 
 	return 0;
 }
 
 static void shadow_control_process(struct nrf_cloud_obj_shadow_data *const input)
 {
+	if (input->type == NRF_CLOUD_OBJ_SHADOW_TYPE_TF) {
+		return;
+	}
+
 	struct nct_cc_data msg = {
 		.opcode = NCT_CC_OPCODE_UPDATE_ACCEPTED,
 		.message_id = NCT_MSG_ID_STATE_REPORT
@@ -442,18 +462,29 @@ static int cc_rx_data_handler(const struct nct_evt *nct_evt)
 	const enum nfsm_state current_state = nfsm_get_current_state();
 	struct nrf_cloud_obj_shadow_accepted shadow_accepted = {0};
 	struct nrf_cloud_obj_shadow_delta shadow_delta = {0};
+	struct nrf_cloud_obj_shadow_transform shadow_tf = {0};
 	struct nrf_cloud_obj_shadow_data shadow_data = {0};
 
 	NRF_CLOUD_OBJ_JSON_DEFINE(shadow_obj);
 
-	LOG_DBG("CC RX on topic [%d] %*s: %s",
+	LOG_DBG("CC RX on topic [%d] %.*s: %s",
 		nct_evt->param.cc->opcode,
 		nct_evt->param.cc->topic.len,
 		(const char *)nct_evt->param.cc->topic.ptr,
 		(const char *)nct_evt->param.cc->data.ptr);
 
-	if ((nct_evt->param.cc->opcode != NCT_CC_OPCODE_UPDATE_ACCEPTED) &&
-	    (nct_evt->param.cc->opcode != NCT_CC_OPCODE_UPDATE_DELTA)) {
+	switch (nct_evt->param.cc->opcode) {
+	case NCT_CC_OPCODE_UPDATE_ACCEPTED:
+	case NCT_CC_OPCODE_UPDATE_DELTA:
+#if defined(CONFIG_NRF_CLOUD_MQTT_SHADOW_TRANSFORMS)
+	case NCT_CC_OPCODE_TRANSFORM:
+#endif
+		break;
+	case NCT_CC_OPCODE_UPDATE_REJECTED:
+		LOG_DBG("Rejected shadow: %s", (char *)nct_evt->param.cc->data.ptr);
+		__fallthrough;
+	default:
+		/* No need to process */
 		return 0;
 	}
 
@@ -479,6 +510,15 @@ static int cc_rx_data_handler(const struct nct_evt *nct_evt)
 			shadow_data.delta = &shadow_delta;
 			LOG_DBG("Delta shadow decoded");
 		}
+#if defined(CONFIG_NRF_CLOUD_MQTT_SHADOW_TRANSFORMS)
+	} else if (nct_evt->param.cc->opcode == NCT_CC_OPCODE_TRANSFORM) {
+		err = nrf_cloud_obj_shadow_transform_decode(&shadow_obj, &shadow_tf);
+		if (!err) {
+			shadow_data.type = NRF_CLOUD_OBJ_SHADOW_TYPE_TF;
+			shadow_data.transform = &shadow_tf;
+			LOG_DBG("Transform result received");
+		}
+#endif
 	}
 
 	nrf_cloud_obj_free(&shadow_obj);
@@ -500,7 +540,7 @@ static int cc_rx_data_handler(const struct nct_evt *nct_evt)
 	}
 
 	/* Process control data */
-	shadow_control_process(&shadow_data);
+	(void)shadow_control_process(&shadow_data);
 
 	/* Check if data should be sent to the application */
 	if (nrf_cloud_shadow_app_send_check(&shadow_data)) {
@@ -518,6 +558,7 @@ static int cc_rx_data_handler(const struct nct_evt *nct_evt)
 	/* Free the shadow objects */
 	nrf_cloud_obj_shadow_accepted_free(&shadow_accepted);
 	nrf_cloud_obj_shadow_delta_free(&shadow_delta);
+	nrf_cloud_obj_shadow_transform_free(&shadow_tf);
 
 	if (!accept) {
 		/* The new state is not accepted */
@@ -611,6 +652,7 @@ static int dc_connection_handler(const struct nct_evt *nct_evt)
 		nfsm_set_current_state_and_notify(STATE_DC_CONNECTED, &evt);
 	}
 
+	(void)nrf_cloud_print_cloud_details();
 	return 0;
 }
 
@@ -729,15 +771,19 @@ static int dc_rx_data_handler(const struct nct_evt *nct_evt)
 		/* Intentional fall-through */
 	case NRF_CLOUD_RCV_TOPIC_GENERAL:
 	default:
-		cloud_evt.type = NRF_CLOUD_EVT_RX_DATA_GENERAL;
 		discon_req = nrf_cloud_disconnection_request_decode(cloud_evt.data.ptr);
+		if (discon_req) {
+			cloud_evt.type = NRF_CLOUD_EVT_RX_DATA_DISCON;
+		} else {
+			cloud_evt.type = NRF_CLOUD_EVT_RX_DATA_GENERAL;
+		}
 		break;
 	}
 
 	nfsm_set_current_state_and_notify(nfsm_get_current_state(), &cloud_evt);
 
 	if (discon_req) {
-		LOG_DBG("Device deleted from nRF Cloud");
+		LOG_INF("Device deleted from nRF Cloud");
 		int err = nrf_cloud_disconnect();
 
 		if (err < 0) {

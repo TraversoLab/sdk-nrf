@@ -7,7 +7,7 @@
 menuconfig WIFI_READY_LIB
 	bool "Wi-Fi ready event handling library"
 	select EXPERIMENTAL
-	depends on WPA_SUPP
+	depends on WIFI_NM_WPA_SUPPLICANT
 	depends on NET_MGMT
 	help
 	  Enable WiFi ready management subsystem that allows the application to
@@ -17,7 +17,7 @@ menuconfig WIFI_READY_LIB
 if WIFI_READY_LIB
 
 module = WIFI_READY_LIB
-module-str = wifi_ready_event_handling
+module-str = wifi_ready_lib
 source "subsys/logging/Kconfig.template.log_config"
 
 config WIFI_READY_MAX_CALLBACKS

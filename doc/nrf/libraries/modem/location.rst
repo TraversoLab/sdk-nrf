@@ -408,8 +408,6 @@ API documentation
 *****************
 
 | Header file: :file:`include/modem/location.h`
-| Source files: :file:`lib/location`
+| Source files: :file:`lib/location/`
 
 .. doxygengroup:: location
-   :project: nrf
-   :members:

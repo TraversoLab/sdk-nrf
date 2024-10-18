@@ -64,38 +64,8 @@ function(include_packaging)
   include(${ZEPHYR_NRF_MODULE_DIR}/subsys/bootloader/cmake/packaging.cmake)
 endfunction()
 
-function(include_fast_pair_hex)
-  include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/fast_pair_hex.cmake)
-endfunction()
-
-function(include_mesh_dfu_metadata)
-  include(${ZEPHYR_NRF_MODULE_DIR}/cmake/mesh_dfu_metadata.cmake)
-  mesh_dfu_metadata()
-endfunction()
-
-function(include_matter_factory_data)
-  include(${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/nrfconnect/chip-module/generate_factory_data_sysbuild.cmake)
-  nrfconnect_generate_factory_data()
-endfunction()
-
-function(include_matter_ota)
-  include(${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/zephyr/ota-image_sysbuild.cmake)
-  chip_ota_image(chip-ota-image
-    INPUT_FILES ${CMAKE_BINARY_DIR}/dfu_multi_image.bin
-    OUTPUT_FILE ${CMAKE_BINARY_DIR}/${SB_CONFIG_MATTER_OTA_IMAGE_FILE_NAME}
-  )
-endfunction()
-
-function(include_nrf700x)
-  include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/nrf700x.cmake)
-endfunction()
-
-function(include_fw_zip)
-  include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/zip.cmake)
-endfunction()
-
-function(include_b0_packaging)
-  include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/b0_packaging.cmake)
+function(include_sdp)
+  include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/sdp.cmake)
 endfunction()
 
 function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
@@ -146,7 +116,7 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
   string(REPLACE "/" ";" split_board_qualifiers "${BOARD_QUALIFIERS}")
   list(GET split_board_qualifiers 1 target_soc)
 
-  if(SB_CONFIG_SOC_SERIES_NRF53X)
+  if(SB_CONFIG_SOC_SERIES_NRF53X OR SB_CONFIG_SOC_SERIES_NRF54LX)
     list(LENGTH split_board_qualifiers target_length)
 
     if("${target_length}" GREATER "3")
@@ -169,7 +139,6 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
   endif()
 
 # TODO: SB_CONFIG_SOC_SERIES_NRF54HX
-# TODO: SB_CONFIG_SOC_SERIES_NRF54LX
 
   if(DEFINED board_qualifiers_secure)
     if(DEFINED BOARD_REVISION)
@@ -189,6 +158,18 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
       # Make mcuboot a build only target as the main application will flash this from the
       # merged hex file
       set_target_properties(mcuboot PROPERTIES BUILD_ONLY true)
+
+      if(DEFINED board_qualifiers_secure)
+        # Apply configuration for MCUboot using all available RAM or not
+        if(SB_CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM)
+          set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM y)
+          set_config_bool(mcuboot CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM y)
+          set_config_bool(mcuboot CONFIG_MCUBOOT_NRF_CLEANUP_NONSECURE_RAM y)
+        else()
+          set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM n)
+          set_config_bool(mcuboot CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM n)
+        endif()
+      endif()
     endif()
 
     set_property(TARGET mcuboot APPEND_STRING PROPERTY CONFIG "CONFIG_UPDATEABLE_IMAGE_NUMBER=${SB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES}\n")
@@ -264,11 +245,63 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
 
     if(SB_CONFIG_PARTITION_MANAGER)
       # Use NCS signing script with support for PM
-# TODO: NCSDK-27560 add firmware loader application signing script support
-      set(${DEFAULT_IMAGE}_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
+      if(SB_CONFIG_QSPI_XIP_SPLIT_IMAGE)
+        set(${DEFAULT_IMAGE}_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing_split.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
 
-      if(SB_CONFIG_MCUBOOT_BUILD_DIRECT_XIP_VARIANT)
-        set(mcuboot_secondary_app_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
+        if(SB_CONFIG_MCUBOOT_BUILD_DIRECT_XIP_VARIANT)
+          set(mcuboot_secondary_app_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing_split.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
+        endif()
+
+        # Share QSPI XIP MCUboot image number with the default image to allow for signing script
+        # to get the partition manager configuration
+        set(${DEFAULT_IMAGE}_QSPI_XIP_IMAGE_NUMBER ${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER} CACHE INTERNAL "QSPI XIP image number" FORCE)
+
+        if(SB_CONFIG_MCUBOOT_BUILD_DIRECT_XIP_VARIANT)
+          set(mcuboot_secondary_app_QSPI_XIP_IMAGE_NUMBER ${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER} CACHE INTERNAL "QSPI XIP image number" FORCE)
+        endif()
+
+        # Flash drivers are mandatory with QSPI XIP split image support
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_FLASH y)
+        set_config_bool(mcuboot CONFIG_FLASH y)
+        set_config_bool(mcuboot CONFIG_MULTITHREADING y)
+        set_config_bool(mcuboot CONFIG_MCUBOOT_VERIFY_IMG_ADDRESS n)
+
+        # Set options on default image to allow QSPI XIP execution
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_XIP y)
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_CODE_DATA_RELOCATION y)
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_HAVE_CUSTOM_LINKER_SCRIPT y)
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_BUILD_NO_GAP_FILL y)
+
+        # Set required options if MCUmgr img mgmt is used
+        if(SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP)
+          set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUMGR_GRP_IMG_QSPI_XIP_SPLIT_IMAGE y)
+        else()
+          set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUMGR_GRP_IMG_QSPI_XIP_SPLIT_IMAGE n)
+        endif()
+
+        if(NOT DEFINED SB_CONFIG_PM_OVERRIDE_EXTERNAL_DRIVER_CHECK)
+          # If external driver check Kconfig is enabled then users will need to select their own
+          # Kconfigs (to allow for forked/derivative QSPI NOR drivers), otherwise force enable the
+          # driver for the default image and MCUboot
+          set_config_bool(${DEFAULT_IMAGE} CONFIG_NORDIC_QSPI_NOR y)
+          set_config_bool(${DEFAULT_IMAGE} CONFIG_NORDIC_QSPI_NOR_XIP y)
+          set_config_bool(mcuboot CONFIG_NORDIC_QSPI_NOR y)
+          set_config_bool(mcuboot CONFIG_NORDIC_QSPI_NOR_XIP y)
+        endif()
+      else()
+        set(${DEFAULT_IMAGE}_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
+
+        if(SB_CONFIG_MCUBOOT_BUILD_DIRECT_XIP_VARIANT)
+          set(mcuboot_secondary_app_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
+        elseif(SB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER)
+          set(firmware_loader_SIGNING_SCRIPT "${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/image_signing_firmware_loader.cmake" CACHE INTERNAL "MCUboot signing script" FORCE)
+
+          set_target_properties(firmware_loader PROPERTIES
+            IMAGE_CONF_SCRIPT ${ZEPHYR_NRF_MODULE_DIR}/sysbuild/image_configurations/firmware_loader_image_default.cmake
+          )
+        endif()
+
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUMGR_GRP_IMG_QSPI_XIP_SPLIT_IMAGE n)
       endif()
 
       if(SB_CONFIG_PM_OVERRIDE_EXTERNAL_DRIVER_CHECK)
@@ -300,6 +333,33 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
     if(NOT DEFINED mcuboot_BOARD AND DEFINED board_target_secure)
       # MCUboot must run in secure mode on the nRF9160/nRF5340
       set_target_properties(mcuboot PROPERTIES BOARD ${board_target_secure})
+    endif()
+
+    if(SB_CONFIG_MCUBOOT_NRF53_MULTI_IMAGE_UPDATE)
+      set_config_bool(mcuboot CONFIG_NRF53_MULTI_IMAGE_UPDATE y)
+      set_config_bool(mcuboot CONFIG_BOOT_IMAGE_ACCESS_HOOKS y)
+      set_config_bool(mcuboot CONFIG_FLASH_SIMULATOR y)
+      set_config_bool(mcuboot CONFIG_FLASH_SIMULATOR_DOUBLE_WRITES y)
+      set_config_bool(mcuboot CONFIG_FLASH_SIMULATOR_STATS n)
+
+      if(NOT SB_CONFIG_MCUBOOT_MODE_OVERWRITE_ONLY)
+        set_config_bool(mcuboot CONFIG_USE_NRF53_MULTI_IMAGE_WITHOUT_UPGRADE_ONLY y)
+      endif()
+    endif()
+
+    # Apply image compression support options
+    if(SB_CONFIG_MCUBOOT_COMPRESSED_IMAGE_SUPPORT)
+      set_config_bool(mcuboot CONFIG_NRF_COMPRESS y)
+      set_config_bool(mcuboot CONFIG_NRF_COMPRESS_DECOMPRESSION y)
+      set_config_bool(mcuboot CONFIG_NRF_COMPRESS_LZMA y)
+      set_config_bool(mcuboot CONFIG_NRF_COMPRESS_LZMA_VERSION_LZMA2 y)
+      set_config_bool(mcuboot CONFIG_NRF_COMPRESS_ARM_THUMB y)
+      set_config_bool(mcuboot CONFIG_NRF_COMPRESS_CLEANUP y)
+      set_config_bool(mcuboot CONFIG_BOOT_DECOMPRESSION y)
+      set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUBOOT_COMPRESSED_IMAGE_SUPPORT_ENABLED y)
+    else()
+      set_config_bool(mcuboot CONFIG_BOOT_DECOMPRESSION n)
+      set_config_bool(${DEFAULT_IMAGE} CONFIG_MCUBOOT_COMPRESSED_IMAGE_SUPPORT_ENABLED n)
     endif()
   endif()
 
@@ -366,7 +426,7 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
     set_config_bool(${DEFAULT_IMAGE} CONFIG_BT_FAST_PAIR y)
 
     if(DEFINED FP_MODEL_ID AND DEFINED FP_ANTI_SPOOFING_KEY)
-      include_fast_pair_hex()
+      include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/fast_pair_hex.cmake)
       set(FP_DATA_PRESENT "y" CACHE INTERNAL "Fast Pair provisioning data provided" FORCE)
     else()
       message(WARNING "Fast Pair support is enabled but `FP_MODEL_ID` or `FP_ANTI_SPOOFING_KEY` were not provided, this is likely to cause a build error")
@@ -376,8 +436,8 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
     set_config_bool(${DEFAULT_IMAGE} CONFIG_BT_FAST_PAIR n)
   endif()
 
-  if(SB_CONFIG_WIFI_NRF700X)
-    set_config_bool(${DEFAULT_IMAGE} CONFIG_WIFI_NRF700X y)
+  if(SB_CONFIG_WIFI_NRF70)
+    set_config_bool(${DEFAULT_IMAGE} CONFIG_WIFI_NRF70 y)
 
     foreach(config WIFI_PATCHES_EXT_FLASH_DISABLED WIFI_PATCHES_EXT_FLASH_XIP
             WIFI_PATCHES_EXT_FLASH_STORE)
@@ -399,28 +459,50 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
       set_config_bool(${DEFAULT_IMAGE} CONFIG_NRF_WIFI_FW_PATCH_DFU ${SB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH})
     endif()
   else()
-    set_config_bool(${DEFAULT_IMAGE} CONFIG_WIFI_NRF700X n)
+    set_config_bool(${DEFAULT_IMAGE} CONFIG_WIFI_NRF70 n)
   endif()
 
-  if(SB_CONFIG_MATTER)
-    set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP y)
+  if(SB_CONFIG_ZEPHYR_CONNECTEDHOMEIP_MODULE)
+    if(SB_CONFIG_MATTER)
+      set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP y)
 
-    if(SB_CONFIG_MATTER_OTA)
-      set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_REQUESTOR y)
-      set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_IMAGE_BUILD y)
+      if(SB_CONFIG_MATTER_OTA)
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_REQUESTOR y)
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_IMAGE_BUILD y)
+      else()
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_REQUESTOR n)
+        set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_IMAGE_BUILD n)
+      endif()
     else()
-      set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_REQUESTOR n)
-      set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP_OTA_IMAGE_BUILD n)
+      set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP n)
     endif()
-  else()
-    set_config_bool(${DEFAULT_IMAGE} CONFIG_CHIP n)
   endif()
 
   if(SB_CONFIG_SUIT_BUILD_RECOVERY)
     set_config_bool(${DEFAULT_IMAGE} CONFIG_SUIT_MPI_APP_RECOVERY y)
     set_config_bool(${DEFAULT_IMAGE} CONFIG_SUIT_MPI_RAD_RECOVERY y)
   endif()
+
+  if(SB_CONFIG_SDP)
+    include_sdp()
+  endif()
 endfunction(${SYSBUILD_CURRENT_MODULE_NAME}_pre_cmake)
+
+function(${SYSBUILD_CURRENT_MODULE_NAME}_pre_image_cmake)
+  cmake_parse_arguments(PRE_IMAGE_CMAKE "" "IMAGE" "" ${ARGN})
+
+  get_property(variant_app TARGET ${PRE_IMAGE_CMAKE_IMAGE} PROPERTY NCS_VARIANT_APPLICATION)
+  if(NOT "${variant_app}" STREQUAL "")
+    set(variant_image ${PRE_IMAGE_CMAKE_IMAGE})
+
+    get_cmake_property(sysbuild_cache CACHE_VARIABLES)
+    foreach(var_name ${sysbuild_cache})
+      if("${var_name}" MATCHES "^${variant_app}_(.*)$")
+        set(${variant_image}_${CMAKE_MATCH_1} "${${var_name}}" CACHE UNINITIALIZED "" FORCE)
+      endif()
+    endforeach()
+  endif()
+endfunction(${SYSBUILD_CURRENT_MODULE_NAME}_pre_image_cmake)
 
 # Sysbuild function hooks used by nRF Connect SDK
 function(${SYSBUILD_CURRENT_MODULE_NAME}_post_cmake)
@@ -436,30 +518,42 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_post_cmake)
 
   if(SB_CONFIG_SECURE_BOOT OR SB_CONFIG_MCUBOOT_HARDWARE_DOWNGRADE_PREVENTION)
     include_provision_hex()
-
-    if(NOT SB_CONFIG_BOOTLOADER_MCUBOOT AND SB_CONFIG_SECURE_BOOT_APPCORE AND SB_CONFIG_SECURE_BOOT_BUILD_S1_VARIANT_IMAGE)
-      include_b0_packaging()
-    endif()
   endif()
 
   if(SB_CONFIG_MATTER_FACTORY_DATA_GENERATE AND SB_CONFIG_PARTITION_MANAGER)
-    include_matter_factory_data()
+    include(${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/nrfconnect/chip-module/generate_factory_data_sysbuild.cmake)
+    nrfconnect_generate_factory_data()
   endif()
 
   if(SB_CONFIG_MATTER_OTA)
-    include_matter_ota()
+    include(${ZEPHYR_CONNECTEDHOMEIP_MODULE_DIR}/config/zephyr/ota-image_sysbuild.cmake)
+    if(SB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_BUILD)
+      chip_ota_image(chip-ota-image
+        INPUT_FILES ${CMAKE_BINARY_DIR}/dfu_multi_image.bin
+        OUTPUT_FILE ${CMAKE_BINARY_DIR}/${SB_CONFIG_MATTER_OTA_IMAGE_FILE_NAME}
+      )
+    elseif(SB_CONFIG_SUIT_ENVELOPE)
+      chip_ota_image(chip-ota-image
+        INPUT_FILES ${CMAKE_BINARY_DIR}/DFU/root.suit
+        OUTPUT_FILE ${CMAKE_BINARY_DIR}/${SB_CONFIG_MATTER_OTA_IMAGE_FILE_NAME}
+      )
+    endif()
   endif()
 
   if(SB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE)
-    include_nrf700x()
+    include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/nrf700x.cmake)
   endif()
 
   if(SB_CONFIG_DFU_ZIP)
-    include_fw_zip()
+    if(SB_CONFIG_BOOTLOADER_MCUBOOT)
+      include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/zip.cmake)
+    else()
+      include(${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/b0_packaging.cmake)
+    endif()
   endif()
 
   if(SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA)
-    include_mesh_dfu_metadata()
+    include(${ZEPHYR_NRF_MODULE_DIR}/cmake/mesh_dfu_metadata.cmake)
   endif()
 
   include(${ZEPHYR_NRF_MODULE_DIR}/cmake/extensions.cmake)
@@ -482,12 +576,39 @@ function(${SYSBUILD_CURRENT_MODULE_NAME}_post_cmake)
     endif()
 
     if(SB_CONFIG_SUPPORT_NETCORE AND NOT SB_CONFIG_NETCORE_EMPTY)
-      get_property(PM_MCUBOOT_PRIMARY_1_SIZE TARGET partition_manager PROPERTY PM_MCUBOOT_PRIMARY_1_SIZE)
+      get_property(PM_MCUBOOT_PRIMARY_${SB_CONFIG_MCUBOOT_NETWORK_CORE_IMAGE_NUMBER}_SIZE TARGET partition_manager PROPERTY PM_MCUBOOT_PRIMARY_${SB_CONFIG_MCUBOOT_NETWORK_CORE_IMAGE_NUMBER}_SIZE)
     endif()
 
     if(SB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE)
       get_property(PM_NRF70_WIFI_FW_OFFSET TARGET partition_manager PROPERTY PM_NRF70_WIFI_FW_OFFSET)
       get_property(PM_NRF70_WIFI_FW_SIZE TARGET partition_manager PROPERTY PM_NRF70_WIFI_FW_SIZE)
+    endif()
+
+    if(SB_CONFIG_QSPI_XIP_SPLIT_IMAGE)
+      get_property(PM_MCUBOOT_PRIMARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_ADDRESS TARGET partition_manager PROPERTY PM_MCUBOOT_PRIMARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_ADDRESS)
+      get_property(PM_MCUBOOT_PRIMARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_SIZE TARGET partition_manager PROPERTY PM_MCUBOOT_PRIMARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_SIZE)
+      get_property(PM_MCUBOOT_SECONDARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_ADDRESS TARGET partition_manager PROPERTY PM_MCUBOOT_SECONDARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_ADDRESS)
+      get_property(PM_MCUBOOT_SECONDARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_SIZE TARGET partition_manager PROPERTY PM_MCUBOOT_SECONDARY_${SB_CONFIG_MCUBOOT_QSPI_XIP_IMAGE_NUMBER}_SIZE)
+    elseif(SB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER)
+      get_property(PM_MCUBOOT_SECONDARY_ADDRESS TARGET partition_manager PROPERTY PM_MCUBOOT_SECONDARY_ADDRESS)
+      get_property(PM_MCUBOOT_SECONDARY_SIZE TARGET partition_manager PROPERTY PM_MCUBOOT_SECONDARY_SIZE)
+    endif()
+
+    # If the network core image is enabled on nRF53, ensure it is flashed before the main application
+    if(SB_CONFIG_SUPPORT_NETCORE AND NOT SB_CONFIG_NETCORE_NONE)
+      sysbuild_add_dependencies(FLASH ${DEFAULT_IMAGE} ${SB_CONFIG_NETCORE_IMAGE_NAME})
+    endif()
+
+    if(SB_CONFIG_QSPI_XIP_SPLIT_IMAGE AND SB_CONFIG_SOC_NRF52840)
+      # Emit a warning to the user to not relocate interrupts as this can brick nRF52840 devices
+      message(WARNING "
+      --------------------------------------------------------------------------------------------
+      --- WARNING: SB_CONFIG_QSPI_XIP_SPLIT_IMAGE is enabled and target device is an nRF52840: ---
+      --- Care must be taken to not relocate any interrupts to the QSPI XIP flash as this can  ---
+      --- cause the SoC to enter an undefined operation state, causing the debug access port   ---
+      --- to become blocked, potentially bricking the device.                                  ---
+      --------------------------------------------------------------------------------------------
+      ")
     endif()
   endif()
   foreach(image ${IMAGES})
@@ -521,9 +642,11 @@ set(NCS_SYSBUILD_PARTITION_MANAGER TRUE)
 list(APPEND CMAKE_MODULE_PATH ${ZEPHYR_NRF_MODULE_DIR}/cmake/sysbuild/modules)
 include(ncs_sysbuild_extensions)
 include(${CMAKE_CURRENT_LIST_DIR}/extensions.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/appcore.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/netcore.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/secureboot.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/mcuboot.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/suit.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/sdp.cmake)
 
 store_ncs_vars()

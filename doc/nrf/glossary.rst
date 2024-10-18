@@ -51,7 +51,7 @@ Glossary
 
    Attribute Protocol (ATT)
       "[It] allows a device referred to as the server to expose a set of attributes and their associated values to a peer device referred to as the client."
-      `Bluetooth Core Specification`_, Version 5.3, Vol 3, Part F, Section 1.1.
+      `Bluetooth Core Specification`_, Vol 3, Part F, Section 1.1.
 
    AT command
       A command used to control the modem.
@@ -160,6 +160,10 @@ Glossary
 
    Commit tag
       A tag prepended to the first line of the commit message to ease filtering and identification of particular :term:`commit <Commit>` types.
+
+   Companion component
+      A firmware component that is independent from the application and is included in your project as a separate firmware image.
+      The |NCS| provides several :ref:`companion components <companion_components>` tailored for different purposes.
 
    Connected Isochronous Stream (CIS)
       A configuration of the :term:`Isochronous channels (ISO)` feature of the :term:`LE Audio` standard.
@@ -345,11 +349,11 @@ Glossary
    Generic Access Profile (GAP)
       A base profile that all Bluetooth devices implement.
       It defines the basic requirements of a Bluetooth device.
-      See `Bluetooth Core Specification`_, Version 5.3, Vol 1, Part A, Section 6.2.
+      See `Bluetooth Core Specification`_, Vol 1, Part A, Section 6.2.
 
    Generic Attribute Profile (GATT)
       "Generic Attribute Profile (GATT) is built on top of the Attribute Protocol (ATT) and establishes common operations and a framework for the data transported and stored by the Attribute Protocol."
-      `Bluetooth Core Specification`_, Version 5.3, Vol 1, Part A, Section 6.4.2.
+      `Bluetooth Core Specification`_, Vol 1, Part A, Section 6.4.2.
 
    Global Navigation Satellite System (GNSS)
       A satellite navigation system with global coverage.
@@ -458,14 +462,14 @@ Glossary
 
    Link Layer (LL)
       "A control protocol for the link and physical layers that is carried over logical links in addition to user data."
-      `Bluetooth Core Specification`_, Version 5.3, Vol 1, Part A, Section 1.2.
+      `Bluetooth Core Specification`_, Vol 1, Part A, Section 1.2.
       It is implemented in the Bluetooth LE Controller layer.
 
    Logical Link Control and Adaptation Protocol (L2CAP)
       A protocol used within the Bluetooth protocol stack.
       "[It] provides a channel-based abstraction to applications and services.
       It carries out segmentation and reassembly of application data and multiplexing and de-multiplexing of multiple channels over a shared logical link."
-      `Bluetooth Core Specification`_, Version 5.3, Vol 1, Part A, Section 1.1.
+      `Bluetooth Core Specification`_, Vol 1, Part A, Section 1.1.
 
    Low-density parity-check (LDPC)
       A class of error correcting codes that may be employed for providing error correction of transmission errors in communication systems.

@@ -9,10 +9,11 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp/ns
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp nrf54l15dk/nrf54l15/cpuapp/ns
+    tags: sysbuild ci_samples_matter
   sample.matter.light_bulb.release:
     sysbuild: true
     build_only: true
@@ -22,10 +23,10 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
   sample.matter.light_bulb.lto:
     sysbuild: true
     build_only: true
@@ -34,10 +35,10 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
   sample.matter.light_bulb.ffs:
     sysbuild: true
     build_only: true
@@ -48,10 +49,10 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
     platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+      nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
   sample.matter.light_bulb.debug.nrf21540ek:
     sysbuild: true
     build_only: true
@@ -59,7 +60,7 @@ tests:
     integration_platforms:
       - nrf52840dk/nrf52840
     platform_allow: nrf52840dk/nrf52840
-    tags: sysbuild
+    tags: sysbuild ci_samples_matter
   sample.matter.light_bulb.debug.nrf21540ek_fwd:
     sysbuild: true
     build_only: true
@@ -67,21 +68,30 @@ tests:
     integration_platforms:
       - nrf5340dk/nrf5340/cpuapp
     platform_allow: nrf5340dk/nrf5340/cpuapp
-    tags: sysbuild
+    tags: sysbuild ci_samples_matter
   # Sample to execute load tests
   sample.matter.light_bulb.memory_profiling.persistent_subscriptions:
     sysbuild: true
     build_only: true
     extra_args: CONFIG_CHIP_PERSISTENT_SUBSCRIPTIONS=y
       CONFIG_CHIP_MEMORY_PROFILING=y CONFIG_SHELL_MINIMAL=y
-    platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp nrf7002dk/nrf5340/cpuapp
-      nrf54l15pdk/nrf54l15/cpuapp
+    platform_allow: nrf52840dk/nrf52840 nrf5340dk/nrf5340/cpuapp
+      nrf54l15dk/nrf54l15/cpuapp
     integration_platforms:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
+      - nrf54l15dk/nrf54l15/cpuapp
+    tags: sysbuild ci_samples_matter
+  sample.matter.light_bulb.lto.memory_profiling.persistent_subscriptions:
+    sysbuild: true
+    build_only: true
+    extra_args: CONFIG_CHIP_PERSISTENT_SUBSCRIPTIONS=y
+      CONFIG_CHIP_MEMORY_PROFILING=y CONFIG_SHELL_MINIMAL=y CONFIG_LTO=y
+      CONFIG_ISR_TABLES_LOCAL_DECLARATION=y
+    platform_allow: nrf7002dk/nrf5340/cpuapp
+    integration_platforms:
       - nrf7002dk/nrf5340/cpuapp
-      - nrf54l15pdk/nrf54l15/cpuapp
-    tags: sysbuild
+    tags: sysbuild ci_samples_matter
   sample.matter.light_bulb.aws:
     sysbuild: true
     build_only: true
@@ -89,4 +99,4 @@ tests:
     platform_allow: nrf7002dk/nrf5340/cpuapp
     integration_platforms:
       - nrf7002dk/nrf5340/cpuapp
-    tags: sysbuild
+    tags: sysbuild ci_samples_matter

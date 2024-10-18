@@ -29,8 +29,6 @@ function(suit_copy_artifact_to_output_directory target artifact)
     COMMAND ${CMAKE_COMMAND} -E copy ${artifact} ${SUIT_ROOT_DIRECTORY}${target}.bin
     BYPRODUCTS ${SUIT_ROOT_DIRECTORY}${target}.bin
   )
-
-  set_property(GLOBAL APPEND PROPERTY SUIT_DFU_ARTIFACTS ${SUIT_ROOT_DIRECTORY}${target}.bin)
 endfunction()
 
 # Render jinja templates using passed arguments.
@@ -81,9 +79,32 @@ function(suit_create_envelope input_file output_file create_signature)
     BYPRODUCTS ${output_file}
   )
 
-  set_property(GLOBAL APPEND PROPERTY SUIT_DFU_ARTIFACTS ${output_file})
-
   if (create_signature AND SB_CONFIG_SUIT_ENVELOPE_SIGN_SCRIPT)
     suit_sign_envelope(${output_file} ${output_file})
+  endif()
+endfunction()
+
+function(suit_create_cache_partition args output_file partition_num recovery)
+
+  list(APPEND args "--output-file" "${output_file}")
+
+  set_property(
+    GLOBAL APPEND PROPERTY SUIT_POST_BUILD_COMMANDS
+    COMMAND ${PYTHON_EXECUTABLE} ${SUIT_GENERATOR_CLI_SCRIPT}
+    cache_create
+    ${args}
+    BYPRODUCTS ${output_file}
+  )
+
+  get_filename_component(output_file_name ${output_file} NAME)
+
+  if (recovery)
+    set_property(GLOBAL APPEND PROPERTY SUIT_RECOVERY_DFU_ARTIFACTS ${output_file})
+    set_property(GLOBAL APPEND PROPERTY SUIT_RECOVERY_DFU_ZIP_ADDITIONAL_SCRIPT_PARAMS
+                 "${output_file_name}type=cache;${output_file_name}partition=${partition_num};")
+  else()
+    set_property(GLOBAL APPEND PROPERTY SUIT_DFU_ARTIFACTS ${output_file})
+    set_property(GLOBAL APPEND PROPERTY SUIT_DFU_ZIP_ADDITIONAL_SCRIPT_PARAMS
+                 "${output_file_name}type=cache;${output_file_name}partition=${partition_num};")
   endif()
 endfunction()

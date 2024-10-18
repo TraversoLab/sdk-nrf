@@ -37,6 +37,7 @@ The USB stack is selected by enabling one of the following Kconfig choice option
   The USB legacy stack is used by default.
 * :ref:`CONFIG_DESKTOP_USB_STACK_NEXT <config_desktop_app_options>`
   The option enables USB next stack (:kconfig:option:`CONFIG_USB_DEVICE_STACK_NEXT`).
+  This is the only USB stack that supports USB High-Speed and the nRF54H20 platform.
 
 .. note::
   The USB next stack integration is :ref:`experimental <software_maturity>`.
@@ -62,6 +63,27 @@ For the USB legacy stack, this results in updating defaults for the following Kc
 * :kconfig:option:`CONFIG_USB_DEVICE_PID` - Product ID (PID) number.
 
 For the USB next stack, the module uses dedicated APIs to set the USB device identifiers during initialization.
+
+.. _nrf_desktop_usb_state_sof_synchronization:
+
+USB Start of Frame (SOF) synchronization
+========================================
+
+The module receives a HID input report as :c:struct:`hid_report_event` and submits the report to the USB stack.
+The module informs that the HID report was sent using :c:struct:`hid_report_sent_event`.
+
+* If the :ref:`CONFIG_DESKTOP_USB_HID_REPORT_SENT_ON_SOF <config_desktop_app_options>` Kconfig option is disabled, the :c:struct:`hid_report_sent_event` is instantly submitted when a HID report is sent over a USB during USB poll (on USB endpoint read).
+  This approach results in shorter HID data latency as a HID report pipeline is not used.
+  However, the USB peripheral might not provide a HID report during a USB poll if two subsequent USB polls for HID data happen in quick succession.
+  USB polls for HID data are not guaranteed to be evenly spaced in time.
+* If the :ref:`CONFIG_DESKTOP_USB_HID_REPORT_SENT_ON_SOF <config_desktop_app_options>` Kconfig option is enabled, submitting :c:struct:`hid_report_sent_event` is delayed until subsequent USB SOF is reported by the USB stack.
+  USB SOFs, in contrast to USB polls, are always evenly spaced in time.
+  Enabling the Kconfig option reduces the negative impact of jitter related to USB polls and ensures that a HID peripheral can provide a HID input report during every USB poll.
+  However, the feature also increases HID data latency as a HID report pipeline with two sequential reports is used.
+  Without the pipeline, a USB poll happening quickly after a USB SOF might result in no HID report provided by the peripheral because the HID report source would be unable to provide a subsequent HID input report in time.
+
+  In the case of :ref:`nrf_desktop_hid_mouse_report_handling`, enabling the USB SOF synchronization also synchronizes motion sensor sampling with the USB SOF instead of USB polls (motion sensor sampling is synchronized to :c:struct:`hid_report_sent_event`).
+  This synchronization ensures that the sensor is sampled more evenly.
 
 .. _nrf_desktop_usb_state_hid_class_instance:
 
@@ -145,6 +167,9 @@ USB HID configuration in USB next stack
 For the USB next stack, the :ref:`CONFIG_DESKTOP_USB_STACK_NEXT <config_desktop_app_options>` selects the :kconfig:option:`CONFIG_USB_DEVICE_STACK_NEXT` Kconfig option.
 Every USB HID-class instance is configured through a separate DTS node compatible with ``zephyr,hid-device``.
 The DTS node configures, among others, the used HID boot protocol, the size of the longest HID input report, and the HID polling rate.
+You can configure your preferred USB HID polling rate using the ``in-polling-period-us`` property of the DTS node.
+The lowest polling rate that is supported by the USB High-Speed is 125 µs, which corresponds to 8 kHz report rate.
+The lowest polling rate supported by devices that do not support USB High-Speed is 1000 µs, which corresponds to 1 kHz report rate.
 Make sure to update the DTS configuration to match requirements of your application.
 nRF Desktop application defines the USB HID-class instances used by the USB next stack for all of the supported boards and file suffixes.
 See the existing configurations for reference.
@@ -196,12 +221,33 @@ For the USB next stack, a separate callback provided by USB HID-class API is use
 
 When the HID report data is transmitted through :c:struct:`hid_report_event`, the module will pass it to the associated USB HID-class instance.
 Upon data delivery, :c:struct:`hid_report_sent_event` is submitted by the module.
+See :ref:`nrf_desktop_usb_state_sof_synchronization` documentation section for more details about possible HID data flows over USB.
 
 .. note::
-    Only one HID input report is transmitted by the module to a single instance of HID-class USB device at any given time.
+    Only one HID input report is submitted by the module to a single instance of HID-class USB device at any given time.
+    Subsequent HID input report is provided only after the previous one is sent to USB host.
     Different instances can transmit reports in parallel.
 
 The |usb_state| is a transport for :ref:`nrf_desktop_config_channel` when the channel is enabled.
 
 The module also handles a HID keyboard LED output report received through USB from the connected host.
 The module sends the report using :c:struct:`hid_report_event`, that is handled either by :ref:`nrf_desktop_hid_state` (for peripheral) or by the :ref:`nrf_desktop_hid_forward` (for dongle).
+
+nRF54H20 support
+================
+
+Due to the characteristics of the nRF54H20 USB Device Controller (UDC), several changes have been made in the USB state module to support the nRF54H20 platform:
+
+* The USB state module creates a separate thread to initialize, enable, and disable the USB stack.
+* The module disables the USB stack when the USB cable is disconnected and enables the stack when the cable is connected.
+
+These changes are applicable to the nRF54H20 platform only.
+They are necessary to ensure proper USB stack operation on the nRF54H20 platform.
+
+The USB stack cannot be initialized from the system workqueue thread, because it causes a deadlock.
+Because of that, a separate thread is used to initialize the USB stack.
+For more details, see the :ref:`CONFIG_DESKTOP_USB_INIT_THREAD <config_desktop_app_options>` Kconfig option.
+The UDC is powered down whenever the USB cable is disconnected, failing to trigger the necessary callbacks to the USB stack.
+It may cause the USB stack to become non-functional.
+The USB stack is disabled upon disconnecting the cable to work around this issue.
+For more details, see the :ref:`CONFIG_DESKTOP_USB_STACK_NEXT_DISABLE_ON_VBUS_REMOVAL <config_desktop_app_options>` Kconfig option.

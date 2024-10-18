@@ -170,8 +170,153 @@ Protocol support
 
 The following table indicates the software maturity levels of the support for each :ref:`protocol <protocols>`:
 
-.. sml-table:: top_level
-   :insert-values: [("Bluetooth","nRF54L15","Experimental"), ("Bluetooth Mesh","nRF54L15","-"), ("Matter","nRF54L15","Experimental"), ("Sidewalk","nRF54L15","Experimental"), ("Thread","nRF54L15","Experimental"), ("Wi-Fi","nRF54L15","Experimental")]
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * -
+     - nRF52810
+     - nRF52811
+     - nRF52820
+     - nRF52832
+     - nRF52833
+     - nRF52840
+     - nRF5340
+     - nRF54H20
+     - nRF54L15
+     - nRF9131
+     - nRF9151
+     - nRF9160
+     - nRF9161
+   * - **Bluetooth**
+     - Supported
+     - Supported
+     - Supported
+     - Supported
+     - Supported
+     - Supported
+     - Supported
+     - Experimental
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Bluetooth Mesh**
+     - --
+     - --
+     - --
+     - Supported
+     - Supported
+     - Supported
+     - Supported
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **DECT NR+ PHY**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+   * - **LTE**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Supported
+     - Supported
+     - Supported
+     - Supported
+   * - **Matter**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Supported
+     - Supported
+     - Experimental
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Supported
+     - Supported
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Thread**
+     - --
+     - --
+     - --
+     - --
+     - Supported
+     - Supported
+     - Supported
+     - Experimental
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Wi-Fi**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Supported\ :sup:`1`
+     - Supported\ :sup:`2`
+     - Experimental
+     - Experimental
+     - --
+     - Supported\ :sup:`1`
+     - Supported\ :sup:`1`
+     - Supported\ :sup:`1`
+   * - **Zigbee**
+     - --
+     - --
+     - --
+     - --
+     - Supported
+     - Supported
+     - Supported
+     - --
+     - --
+     - --
+     - --
+     - --
+     - --
+
+| [1]: Only with nRF7002 EK, nRF7002 EK in nRF7000 emulation mode or nRF7002 EK in nRF7001 emulation mode
+| [2]: Only with nRF7002 DK, nRF7002 DK in nRF7001 emulation mode, nRF7002 EB, nRF7002 EK, nRF7002 EK in nRF7000 emulation mode or nRF7002 EK in nRF7001 emulation mode
 
 Amazon Sidewalk features support
 ********************************
@@ -180,7 +325,122 @@ The following table indicates the software maturity levels of the support for ea
 
 .. toggle::
 
-  .. sml-table:: sidewalk
+ .. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * -
+     - nRF52810
+     - nRF52811
+     - nRF52820
+     - nRF52832
+     - nRF52833
+     - nRF52840
+     - nRF5340
+     - nRF54H20
+     - nRF54L15
+     - nRF9131
+     - nRF9151
+     - nRF9160
+     - nRF9161
+   * - **Sidewalk - OTA DFU over Bluetooth LE**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk File Transfer (FUOTA)**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk Multi-link + Auto-connect**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk on-device certification**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk over Bluetooth LE**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk over FSK**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
+   * - **Sidewalk over LORA**
+     - --
+     - --
+     - --
+     - --
+     - --
+     - Experimental
+     - Experimental
+     - --
+     - Experimental
+     - --
+     - --
+     - --
+     - --
 
 Bluetooth features support
 **************************
@@ -189,7 +449,80 @@ The following table indicates the software maturity levels of the support for ea
 
 .. toggle::
 
-  .. sml-table:: bluetooth
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Bluetooth LE Peripheral/Central**
+        - Supported
+        - Supported
+        - Experimental
+        - Supported
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Connectionless/Connected CTE Transmitter**
+        - --
+        - Supported
+        - Experimental
+        - --
+        - Supported
+        - --
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **LE Coded PHY**
+        - --
+        - Supported
+        - Experimental
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **LLPM**
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - --
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
 
 Thread features support
 ***********************
@@ -198,7 +531,192 @@ The following table indicates the software maturity levels of the support for ea
 
 .. toggle::
 
-  .. sml-table:: thread
+  .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Thread + nRF21540 (GPIO)**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Thread - Full Thread Device (FTD)**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread - Minimal Thread Device (MTD)**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread 1.1**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread 1.2 - CSL Receiver**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread 1.2 - Core**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread 1.2 - Link Metrics**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread 1.3 - Core**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread FTD + Bluetooth LE multiprotocol**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread MTD + Bluetooth LE multiprotocol**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread Radio Co-Processor (RCP)**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - --
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Thread TCP**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental
+        - Experimental
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
 
 .. _software_maturity_protocol_matter:
 
@@ -209,7 +727,136 @@ The following table indicates the software maturity levels of the support for ea
 
 .. toggle::
 
-  .. sml-table:: matter
+  .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Matter - OTA DFU over Bluetooth LE**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Matter Intermittently Connected Device**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Matter commissioning over Bluetooth LE with NFC onboarding**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Matter commissioning over Bluetooth LE with QR code onboarding**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Matter commissioning over IP**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Matter over Thread**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+      * - **Matter over Wi-Fi**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **OTA DFU over Matter**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - --
+        - --
+        - --
+        - --
 
 Zigbee feature support
 **********************
@@ -218,16 +865,268 @@ The following table indicates the software maturity levels of the support for ea
 
 .. toggle::
 
-  .. sml-table:: zigbee
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **OTA DFU over Zigbee**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Zigbee (Sleepy) End Device**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Zigbee + Bluetooth LE multiprotocol**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Zigbee + nRF21540 (GPIO)**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Zigbee Coordinator**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Zigbee Network Co-Processor (NCP)**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Zigbee Router**
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
 
 Wi-Fi feature support
-**********************
+*********************
 
 The following table indicates the software maturity levels of the support for each Wi-Fi feature:
 
 .. toggle::
 
-  .. sml-table:: wifi
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * - Feature
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Bluetooth LE Coexistence**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental
+        - Supported\ :sup:`1`
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Monitor Mode**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported\ :sup:`1`
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Promiscuous Mode**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental\ :sup:`2`
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **STA Mode**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental\ :sup:`3`
+        - Supported\ :sup:`1`
+        - Experimental\ :sup:`4`
+        - Experimental\ :sup:`5`
+        - --
+        - --
+        - --
+        - --
+      * - **Scan only (for location accuracy)**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental\ :sup:`6`
+        - Supported\ :sup:`7`
+        - --
+        - --
+        - --
+        - Supported\ :sup:`6`
+        - Supported\ :sup:`6`
+        - Supported\ :sup:`6`
+      * - **SoftAP Mode (for Wi-Fi provisioning)**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported\ :sup:`1`
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **TX injection Mode**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported\ :sup:`1`
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **Thread Coexistence**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+
+   | [1]: Only with nRF7002 DK, nRF7002 DK in nRF7001 emulation mode, nRF7002 EB, nRF7002 EK or nRF7002 EK in nRF7001 emulation mode
+   | [2]: Only with nRF7002 DK, nRF7002 DK in nRF7001 emulation mode or nRF7002 EK
+   | [3]: Only with nRF7002 EK or nRF7002 EK in nRF7001 emulation mode
+   | [4]: Only with nRF700X_nRF54H20DK
+   | [5]: Only with nRF700X_nRF54L15PDK
+   | [6]: Only with nRF7002 EK, nRF7002 EK in nRF7000 emulation mode or nRF7002 EK in nRF7001 emulation mode
+   | [7]: Only with nRF7002 DK, nRF7002 EB, nRF7002 EK, nRF7002 EK in nRF7000 emulation mode or nRF7002 EK in nRF7001 emulation mode
 
 Ecosystem support
 *****************
@@ -261,6 +1160,7 @@ The following table indicates the software maturity levels of the support for Go
         - nRF5340
         - nRF54H20
         - nRF54L15
+        - nRF9131
         - nRF9151
         - nRF9160
         - nRF9161
@@ -278,6 +1178,7 @@ The following table indicates the software maturity levels of the support for Go
         - --
         - --
         - --
+        - --
       * - **Locator tag**
         - :ref:`fast_pair_locator_tag`
         - --
@@ -289,6 +1190,7 @@ The following table indicates the software maturity levels of the support for Go
         - Experimental
         - --
         - Experimental
+        - --
         - --
         - --
         - --
@@ -314,6 +1216,7 @@ The following table indicates the software maturity levels of the support for ea
         - nRF5340
         - nRF54H20
         - nRF54L15
+        - nRF9131
         - nRF9151
         - nRF9160
         - nRF9161
@@ -330,6 +1233,7 @@ The following table indicates the software maturity levels of the support for ea
         - --
         - --
         - --
+        - --
       * - **Subsequent pairing**
         - --
         - --
@@ -340,6 +1244,7 @@ The following table indicates the software maturity levels of the support for ea
         - Experimental
         - --
         - Experimental
+        - --
         - --
         - --
         - --
@@ -356,6 +1261,7 @@ The following table indicates the software maturity levels of the support for ea
         - --
         - --
         - --
+        - --
       * - **Personalized Name extension**
         - --
         - --
@@ -369,6 +1275,7 @@ The following table indicates the software maturity levels of the support for ea
         - --
         - --
         - --
+        - --
       * - **Find My Device Network extension**
         - --
         - --
@@ -379,6 +1286,7 @@ The following table indicates the software maturity levels of the support for ea
         - Experimental
         - --
         - Experimental
+        - --
         - --
         - --
         - --
@@ -399,35 +1307,204 @@ Trusted Firmware-M support
 
 .. toggle::
 
-  .. sml-table:: trusted_firmware_m
+  .. list-table::
+     :widths: auto
+     :header-rows: 1
+
+     * -
+       - nRF52810
+       - nRF52811
+       - nRF52820
+       - nRF52832
+       - nRF52833
+       - nRF52840
+       - nRF5340
+       - nRF54H20
+       - nRF54L15
+       - nRF9131
+       - nRF9151
+       - nRF9160
+       - nRF9161
+     * - **Full build**
+       - --
+       - --
+       - --
+       - --
+       - --
+       - --
+       - Experimental
+       - --
+       - Experimental
+       - --
+       - Experimental
+       - Experimental
+       - Experimental
+     * - **Minimal Build**
+       - --
+       - --
+       - --
+       - --
+       - --
+       - --
+       - Supported
+       - --
+       - --
+       - Experimental
+       - Supported
+       - Supported
+       - Supported
 
 PSA Crypto support
 ==================
 
 .. toggle::
 
-  .. sml-table:: psa_crypto
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **PSA Crypto APIs**
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - Experimental
+        - Supported
+        - Supported
+        - Supported
 
 |NSIB|
 ======
 
 .. toggle::
 
-  .. sml-table:: immutable_bootloader
+   .. list-table::
+       :widths: auto
+       :header-rows: 1
+
+       * -
+         - nRF52810
+         - nRF52811
+         - nRF52820
+         - nRF52832
+         - nRF52833
+         - nRF52840
+         - nRF5340
+         - nRF54H20
+         - nRF54L15
+         - nRF9131
+         - nRF9151
+         - nRF9160
+         - nRF9161
+       * - **Immutable Bootloader as part of build**
+         - --
+         - --
+         - --
+         - Supported
+         - Supported
+         - Supported
+         - Supported
+         - --
+         - --
+         - --
+         - Supported
+         - Supported
+         - Supported
 
 Hardware Unique Key
 ===================
 
 .. toggle::
 
-  .. sml-table:: hw_unique_key
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * - Feature
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Key Derivation from Hardware Unique Key**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - --
+        - Experimental
+        - --
+        - Supported
+        - Supported
+        - Supported
 
 Trusted storage
 ===============
 
 .. toggle::
 
-  .. sml-table:: trusted_storage
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **Trusted storage implements the PSA Certified Secure Storage APIs without TF-M**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - Supported
+        - Experimental
+        - Experimental
+        - --
+        - Supported
+        - Supported
+        - Supported
 
 Power management device support
 *******************************
@@ -436,4 +1513,63 @@ The following table indicates the software maturity levels of the support for ea
 
 .. toggle::
 
-  .. sml-table:: power_management
+   .. list-table::
+      :widths: auto
+      :header-rows: 1
+
+      * -
+        - nRF52810
+        - nRF52811
+        - nRF52820
+        - nRF52832
+        - nRF52833
+        - nRF52840
+        - nRF5340
+        - nRF54H20
+        - nRF54L15
+        - nRF9131
+        - nRF9151
+        - nRF9160
+        - nRF9161
+      * - **nPM1100**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Supported
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+      * - **nPM1300**
+        - --
+        - --
+        - --
+        - Supported
+        - --
+        - Supported
+        - Supported
+        - --
+        - Supported
+        - Experimental
+        - Supported
+        - Supported
+        - --
+      * - **nPM6001**
+        - --
+        - --
+        - --
+        - --
+        - --
+        - --
+        - Experimental
+        - --
+        - --
+        - --
+        - Supported
+        - --
+        - --
