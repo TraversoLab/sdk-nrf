@@ -252,38 +252,6 @@ int sx_blkcipher_create_aescbc_dec(struct sxblkcipher *c, const struct sxkeyref 
 	return sx_blkcipher_create_aes_ba411(c, key, iv, BLKCIPHER_MODEID_CBC, ba411cfg.decr);
 }
 
-int sx_blkcipher_create_aescfb_enc(struct sxblkcipher *c, const struct sxkeyref *key,
-				   const char *iv)
-{
-	c->inminsz = 16;
-	c->granularity = 16;
-	return sx_blkcipher_create_aes_ba411(c, key, iv, BLKCIPHER_MODEID_CFB, ba411cfg.encr);
-}
-
-int sx_blkcipher_create_aescfb_dec(struct sxblkcipher *c, const struct sxkeyref *key,
-				   const char *iv)
-{
-	c->inminsz = 16;
-	c->granularity = 16;
-	return sx_blkcipher_create_aes_ba411(c, key, iv, BLKCIPHER_MODEID_CFB, ba411cfg.decr);
-}
-
-int sx_blkcipher_create_aesofb_enc(struct sxblkcipher *c, const struct sxkeyref *key,
-				   const char *iv)
-{
-	c->inminsz = 1;
-	c->granularity = 1;
-	return sx_blkcipher_create_aes_ba411(c, key, iv, BLKCIPHER_MODEID_OFB, ba411cfg.encr);
-}
-
-int sx_blkcipher_create_aesofb_dec(struct sxblkcipher *c, const struct sxkeyref *key,
-				   const char *iv)
-{
-	c->inminsz = 1;
-	c->granularity = 1;
-	return sx_blkcipher_create_aes_ba411(c, key, iv, BLKCIPHER_MODEID_OFB, ba411cfg.decr);
-}
-
 int sx_blkcipher_crypt(struct sxblkcipher *c, const char *datain, size_t sz, char *dataout)
 {
 	if (!c->dma.hw_acquired) {
@@ -476,7 +444,7 @@ int sx_blkcipher_ecb_simple(uint8_t *key, size_t key_size, uint8_t *input, size_
 #if CONFIG_DCACHE
 	sys_cache_data_flush_range(in_descs, sizeof(in_descs));
 	sys_cache_data_flush_range(&out_desc, sizeof(out_desc));
-	sys_cache_data_flush_range(input, sizeof(input));
+	sys_cache_data_flush_range(input, input_size);
 	sys_cache_data_flush_range(output, output_size);
 #endif
 

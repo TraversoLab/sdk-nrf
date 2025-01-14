@@ -10,7 +10,7 @@
 #include <suit_platform_internal.h>
 #include <suit_plat_ipuc.h>
 #include <suit_dfu_cache.h>
-#include <mocks.h>
+#include <mocks_sdfw.h>
 
 #define TEST_DATA_SIZE 64
 #define WRITE_ADDR     0x1A00080000
@@ -57,6 +57,11 @@ static const uint8_t cache2[] = {
 	0x90, 0x70, 0x18, 0x92, 0x36, 0x51, 0x92, 0x83, 0x09, 0x86, 0x70, 0x19, 0x23};
 static const size_t cache2_len = sizeof(cache2);
 
+static struct zcbor_string valid_manifest_component_id = {
+	.value = (const uint8_t *)0x1234,
+	.len = 123,
+};
+
 static void setup_cache_with_sample_entries(void)
 {
 	struct dfu_cache dfu_caches;
@@ -79,7 +84,7 @@ static void setup_cache_with_sample_entries(void)
 static void test_before(void *data)
 {
 	/* Reset mocks */
-	mocks_reset();
+	mocks_sdfw_reset();
 
 	/* Reset common FFF internal structures */
 	FFF_RESET_HISTORY();
@@ -101,31 +106,23 @@ ZTEST(fetch_tests, test_integrated_fetch_to_msink_OK)
 		.len = sizeof(valid_dst_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_dst_component_id, &dst_handle);
+	int ret = suit_plat_create_component_handle(&valid_dst_component_id, false, &dst_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
-
-	arbiter_mem_access_check_fake.return_val = ARBITER_STATUS_OK;
-	arbiter_mem_access_check_fake.call_count = 0;
-
-	struct zcbor_string *ipuc_component_id = suit_plat_find_sdfw_mirror_ipuc(1);
-
-	zassert_is_null(ipuc_component_id, "in-place updateable component found");
+	ret = suit_plat_ipuc_write(dst_handle, 0, (uintptr_t)test_data, sizeof(test_data), true);
+	zassert_equal(ret, SUIT_PLAT_ERR_NOT_FOUND, "in-place updateable component found");
 
 	ret = suit_plat_ipuc_declare(dst_handle);
-	zassert_equal(ret, SUIT_SUCCESS, "suit_plat_ipuc_declare failed - error %i", ret);
+	zassert_equal(ret, SUIT_PLAT_SUCCESS, "suit_plat_ipuc_declare failed - error %i", ret);
 
-	ipuc_component_id = suit_plat_find_sdfw_mirror_ipuc(1);
-	zassert_not_null(ipuc_component_id, "in-place updateable component not found");
+	ret = suit_plat_ipuc_write(dst_handle, 0, (uintptr_t)test_data, sizeof(test_data), true);
+	zassert_equal(ret, SUIT_PLAT_SUCCESS, "cannot write to in-place updateable component");
 
-	ret = suit_plat_fetch_integrated(dst_handle, &source, NULL);
+	ret = suit_plat_fetch_integrated(dst_handle, &source, &valid_dst_component_id, NULL);
 	zassert_equal(ret, SUIT_SUCCESS, "suit_plat_fetch failed - error %i", ret);
 
-	ipuc_component_id = suit_plat_find_sdfw_mirror_ipuc(1);
-	zassert_is_null(ipuc_component_id, "in-place updateable component found");
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 1,
-		      "Incorrect number of arbiter_mem_access_check() calls");
+	ret = suit_plat_ipuc_write(dst_handle, 0, (uintptr_t)test_data, sizeof(test_data), true);
+	zassert_equal(ret, SUIT_PLAT_ERR_NOT_FOUND, "in-place updateable component found");
 
 	ret = suit_plat_release_component_handle(dst_handle);
 	zassert_equal(ret, SUIT_SUCCESS, "dst_handle release failed - error %i", ret);
@@ -145,15 +142,13 @@ ZTEST(fetch_tests, test_integrated_fetch_to_memptr_OK)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
-	ret = suit_plat_fetch_integrated(component_handle, &source, NULL);
+	ret = suit_plat_fetch_integrated(component_handle, &source, &valid_manifest_component_id,
+					 NULL);
 	zassert_equal(ret, SUIT_SUCCESS, "suit_plat_fetch failed - error %i", ret);
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
 
 	ret = suit_plat_component_impl_data_get(component_handle, &handle);
 	zassert_equal(ret, SUIT_SUCCESS, "suit_plat_component_impl_data_get failed - error %i",
@@ -187,17 +182,14 @@ ZTEST(fetch_tests, test_fetch_to_memptr_OK)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
 	setup_cache_with_sample_entries();
 
-	ret = suit_plat_fetch(component_handle, &uri, NULL);
+	ret = suit_plat_fetch(component_handle, &uri, &valid_manifest_component_id, NULL);
 	zassert_equal(ret, SUIT_SUCCESS, "suit_plat_fetch failed - error %i", ret);
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
 
 	ret = suit_plat_release_component_handle(component_handle);
 	zassert_equal(ret, SUIT_SUCCESS, "Handle release failed - error %i", ret);
@@ -219,18 +211,16 @@ ZTEST(fetch_tests, test_fetch_to_memptr_NOK_uri_not_in_cache)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
 	setup_cache_with_sample_entries();
 
-	ret = suit_plat_fetch(component_handle, &uri, NULL);
-	zassert_not_equal(ret, SUIT_SUCCESS,
-			  "suit_plat_fetch should fail - supplied uri is not in cache", ret);
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
+	ret = suit_plat_fetch(component_handle, &uri, &valid_manifest_component_id, NULL);
+	zassert_equal(ret, SUIT_SUCCESS,
+			  "suit_plat_fetch should succeed - supplied uri is not in cache, "
+			  "treated as empty payload");
 
 	ret = suit_plat_release_component_handle(component_handle);
 	zassert_equal(ret, SUIT_SUCCESS, "Handle release failed - error %i", ret);
@@ -252,18 +242,15 @@ ZTEST(fetch_tests, test_fetch_to_memptr_NOK_invalid_component_id)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
 	setup_cache_with_sample_entries();
 
-	ret = suit_plat_fetch(component_handle, &uri, NULL);
+	ret = suit_plat_fetch(component_handle, &uri, &valid_manifest_component_id, NULL);
 	zassert_not_equal(ret, SUIT_SUCCESS,
 			  "suit_plat_fetch should have failed - invalid component_id");
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
 
 	ret = suit_plat_release_component_handle(component_handle);
 	zassert_equal(ret, SUIT_SUCCESS, "Handle release failed - error %i", ret);
@@ -284,16 +271,14 @@ ZTEST(fetch_tests, test_integrated_fetch_to_memptr_NOK_data_ptr_NULL)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
-	ret = suit_plat_fetch_integrated(component_handle, &source, NULL);
+	ret = suit_plat_fetch_integrated(component_handle, &source, &valid_manifest_component_id,
+					 NULL);
 	zassert_not_equal(ret, SUIT_SUCCESS,
 			  "suit_plat_fetch should have failed - NULL data pointer");
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
 
 	ret = suit_plat_release_component_handle(component_handle);
 	zassert_equal(ret, SUIT_SUCCESS, "Handle release failed - error %i", ret);
@@ -312,15 +297,13 @@ ZTEST(fetch_tests, test_integrated_fetch_to_memptr_NOK_data_size_zero)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
-	ret = suit_plat_fetch_integrated(component_handle, &source, NULL);
+	ret = suit_plat_fetch_integrated(component_handle, &source, &valid_manifest_component_id,
+					 NULL);
 	zassert_not_equal(ret, SUIT_SUCCESS, "suit_plat_fetch should have failed - data size 0");
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
 
 	ret = suit_plat_release_component_handle(component_handle);
 	zassert_equal(ret, SUIT_SUCCESS, "Handle release failed - error %i", ret);
@@ -339,15 +322,13 @@ ZTEST(fetch_tests, test_integrated_fetch_to_memptr_NOK_handle_NULL)
 		.len = sizeof(valid_value),
 	};
 
-	int ret = suit_plat_create_component_handle(&valid_component_id, &component_handle);
+	int ret = suit_plat_create_component_handle(&valid_component_id, false, &component_handle);
 
 	zassert_equal(ret, SUIT_SUCCESS, "create_component_handle failed - error %i", ret);
 
-	ret = suit_plat_fetch_integrated(component_handle, &source, NULL);
+	ret = suit_plat_fetch_integrated(component_handle, &source, &valid_manifest_component_id,
+					 NULL);
 	zassert_equal(ret, SUIT_SUCCESS, "suit_plat_fetch failed - error %i", ret);
-
-	zassert_equal(arbiter_mem_access_check_fake.call_count, 0,
-		      "Incorrect number of arbiter_mem_access_check() calls");
 
 	const uint8_t *payload;
 	size_t payload_size = 0;

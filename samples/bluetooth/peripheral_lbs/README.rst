@@ -117,6 +117,9 @@ Building and running
 
 .. include:: /includes/nRF54H20_erase_UICR.txt
 
+.. note::
+   |54H_engb_2_8|
+
 Minimal build
 =============
 
@@ -136,7 +139,7 @@ Testing
 
 After programming the sample to your dongle or development kit, one of the LEDs starts blinking to indicate that the advertising loop is active (see `User interface`_ for details).
 
-To test the sample using the `nRF Connect for Mobile`_ mobile application, complete the following steps:
+To test the sample using the `nRF Connect for Mobile`_ application, complete the following steps:
 
 .. tabs::
 

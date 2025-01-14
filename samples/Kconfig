@@ -13,7 +13,7 @@ config NCS_SAMPLES_DEFAULTS
 	imply ASSERT_NO_COND_INFO
 	imply ASSERT_NO_MSG_INFO
 	imply HW_STACK_PROTECTION if ARCH_HAS_STACK_PROTECTION
-	imply RESET_ON_FATAL_ERROR if !DEBUG && !BOARD_NATIVE_POSIX && !QEMU_TARGET && !TEST
+	imply RESET_ON_FATAL_ERROR if !DEBUG && !BOARD_NATIVE_SIM && !QEMU_TARGET && !TEST
 	help
 	  Use the default configuration for NCS samples.
 
@@ -71,13 +71,6 @@ config NCS_SAMPLE_DTM_REMOTE_HCI_CHILD_IMAGE
 	  application core UART peripheral.
 
 if NCS_INCLUDE_RPMSG_CHILD_IMAGE
-
-config NCS_SAMPLE_MULTIPROTOCOL_RPMSG_CHILD_IMAGE
-	bool
-	depends on BT_HCI_IPC && NRF_802154_SER_HOST && !BT_RPC && !NRF70_RADIO_TEST_COMBO
-	default y
-	help
-	  multiprotocol_rpmsg sample as a child image (network core).
 
 config NCS_SAMPLE_HCI_IPC_CHILD_IMAGE
 	bool

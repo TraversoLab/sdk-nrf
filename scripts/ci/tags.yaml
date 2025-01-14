@@ -54,7 +54,6 @@ bluetooth:
     - nrf/drivers/mpsl/
     - nrf/include/bluetooth/
     - nrf/samples/bluetooth/
-    - nrf/samples/nrf5340/multiprotocol_rpmsg/
     - nrf/subsys/bluetooth/
     - nrf/subsys/mpsl/
     - nrf/subsys/nrf_rpc/
@@ -63,10 +62,9 @@ bluetooth:
     - nrf/tests/bluetooth/
     - nrf/tests/subsys/bluetooth/
     - nrfxlib/crypto/
+    - nrfxlib/mpsl/fem/include
     - nrfxlib/mpsl/include/
-    - nrfxlib/mpsl/lib/
     - nrfxlib/softdevice_controller/include/
-    - nrfxlib/softdevice_controller/lib/
     - zephyr/cmake/
     - zephyr/drivers/bluetooth/
     - zephyr/include/zephyr/bluetooth/
@@ -170,7 +168,6 @@ ci_applications_matter: &ci_matter
     - nrf/modules/mcuboot/
     - nrf/modules/nrfxlib/nrf_802154/
     - nrf/samples/matter/
-    - nrf/samples/nrf5340/multiprotocol_rpmsg/
     - nrf/snippets/matter-diagnostic-logs/
     - nrf/subsys/bluetooth/controller/
     - nrf/subsys/bootloader/
@@ -238,7 +235,6 @@ ci_samples_zigbee: &ci_zigbee
     - nrf/include/zigbee/
     - nrf/modules/mcuboot/
     - nrf/modules/nrfxlib/nrf_802154/
-    - nrf/samples/nrf5340/multiprotocol_rpmsg/
     - nrf/samples/zigbee/
     - nrf/subsys/bluetooth/controller/
     - nrf/subsys/bluetooth/services/
@@ -350,6 +346,24 @@ ci_samples_nfc:
     - nrf/samples/nfc/
     - nrf/subsys/nfc/
     - nrfxlib/nfc/
+
+ci_samples_nrf_compress:
+  files:
+    - bootloader/mcuboot/
+    - modules/lib/zcbor/
+    - nrf/samples/nrf_compress/
+    - nrf/subsys/nrf_compress/
+    - zephyr/subsys/storage/
+
+ci_tests_lib_date_time_unity:
+  files:
+    - nrf/lib/at_monitor/
+    - nrf/lib/at_parser/
+    - nrf/lib/date_time/
+    - nrf/lib/lte_link_control/
+    - nrf/tests/include/
+    - nrf/tests/lib/date_time/
+    - nrf/tests/mocks/nrf_modem_at/
 
 Sidewalk:
   files:
@@ -931,9 +945,12 @@ ci_tests_subsys_mpsl:
 
 ci_tests_subsys_nrf_compress:
   files:
-    - nrf/subsys/nrf_compress/
+    - bootloader/mcuboot/
     - nrf/include/nrf_compress/
+    - nrf/subsys/nrf_compress/
     - nrf/tests/subsys/nrf_compress/
+    - zephyr/subsys/dfu/
+    - zephyr/subsys/storage/
 
 ci_tests_subsys_nfc:
   files:
@@ -1227,6 +1244,7 @@ ci_tests_benchmarks_peripheral_load:
     - zephyr/drivers/sensor/nordic/temp/
     - zephyr/drivers/adc/
     - zephyr/drivers/can/
+    - zephyr/drivers/clock_control/
     - zephyr/drivers/counter/
     - zephyr/drivers/flash/
     - zephyr/drivers/gpio/
@@ -1249,6 +1267,7 @@ ci_tests_benchmarks_current_consumption:
     - nrf/include/nfc/
     - nrf/subsys/nfc/
     - nrf/tests/benchmarks/current_consumption/
+    - nrf/tests/benchmarks/power_consumption/
     - nrfxlib/nfc/
     - zephyr/boards/nordic/
     - zephyr/drivers/gpio/
@@ -1261,6 +1280,7 @@ ci_tests_benchmarks_current_consumption:
     - zephyr/drivers/spi/
     - zephyr/drivers/counter/
     - zephyr/soc/nordic/
+    - zephyr/drivers/sensor/nordic/temp/
 
 ci_tests_drivers_egpio:
   files:

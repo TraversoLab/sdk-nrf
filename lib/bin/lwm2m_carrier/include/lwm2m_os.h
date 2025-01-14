@@ -30,7 +30,7 @@ extern "C" {
 /**
  * @brief Maximum number of timers that the system must support.
  */
-#define LWM2M_OS_MAX_TIMER_COUNT (4 + (LWM2M_OS_MAX_WORK_QS * 4))
+#define LWM2M_OS_MAX_TIMER_COUNT (6 + (LWM2M_OS_MAX_WORK_QS * 4))
 
 typedef int lwm2m_os_work_q_t;
 typedef int lwm2m_os_timer_t;
@@ -38,7 +38,7 @@ typedef int lwm2m_os_timer_t;
 /**
  * @brief Maximum number of semaphores that the system must support.
  */
-#define LWM2M_OS_MAX_SEM_COUNT (6 + (LWM2M_OS_MAX_WORK_QS * 1))
+#define LWM2M_OS_MAX_SEM_COUNT (8 + (LWM2M_OS_MAX_WORK_QS * 1))
 
 typedef int lwm2m_os_sem_t;
 
@@ -161,6 +161,9 @@ enum lwm2m_os_pdn_event {
 	LWM2M_OS_PDN_EVENT_IPV6_UP,
 	LWM2M_OS_PDN_EVENT_IPV6_DOWN,
 	LWM2M_OS_PDN_EVENT_NETWORK_DETACHED,
+	LWM2M_OS_PDN_EVENT_APN_RATE_CONTROL_ON,
+	LWM2M_OS_PDN_EVENT_APN_RATE_CONTROL_OFF,
+	LWM2M_OS_PDN_EVENT_CTX_DESTROYED,
 };
 
 /**
@@ -327,16 +330,33 @@ uint32_t lwm2m_os_rand_get(void);
 
 /**
  * @brief Delete a non-volatile storage entry.
+ *
+ * @param[in] id of the entry to be deleted.
+ *
+ * @retval  0      If success
+ * @retval  -ERRNO errno code if error.
  */
 int lwm2m_os_storage_delete(uint16_t id);
 
 /**
  * @brief Read an entry from non-volatile storage.
+ *
+ * @param[in]     id   of the entry to be read.
+ * @param[out]    data Pointer to data buffer.
+ * @param[in,out] len  Number of bytes to be read.
+ *
+ * @return Number of bytes read. On error, returns a negative value.
  */
 int lwm2m_os_storage_read(uint16_t id, void *data, size_t len);
 
 /**
  * @brief Write an entry to non-volatile storage.
+ *
+ * @param[in]     id   ID of the entry to be written.
+ * @param[in]     data Pointer to the data to be written.
+ * @param[in,out] len  Number of bytes to be written.
+ *
+ * @return Number of bytes written. On error, returns a negative value.
  */
 int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len);
 
@@ -362,17 +382,6 @@ void lwm2m_os_timer_get(lwm2m_os_timer_handler_t handler, lwm2m_os_timer_t **tim
  * @brief Release a timer task.
  */
 void lwm2m_os_timer_release(lwm2m_os_timer_t *timer);
-
-/**
- * @brief Start a timer on system work queue.
- *
- * @param timer Timer task.
- * @param delay Delay before submitting the task in ms.
- *
- * @retval  0      Work placed on queue, already on queue or already running.
- * @retval -EINVAL Timer not found.
- */
-int lwm2m_os_timer_start(lwm2m_os_timer_t *timer, int64_t delay);
 
 /**
  * @brief Start a timer on a specific queue.
@@ -438,7 +447,7 @@ void lwm2m_os_sms_client_deregister(int handle);
  *
  * @retval  0      If success.
  */
-int lwm2m_os_download_get(const char *host, const struct lwm2m_os_download_cfg *cfg, size_t from);
+int lwm2m_os_download_get(const char *uri, const struct lwm2m_os_download_cfg *cfg, size_t from);
 
 /**
  * @brief Disconnect from the server.
@@ -464,13 +473,31 @@ int lwm2m_os_download_init(lwm2m_os_download_callback_t lib_callback);
 int lwm2m_os_download_file_size_get(size_t *size);
 
 /**
+ * @brief Check if UICC LwM2M bootstrap is enabled.
+ *
+ * @retval  true  If enabled
+ * @retval  false If disabled
+ */
+bool lwm2m_os_uicc_bootstrap_is_enabled(void);
+
+/**
+ * @brief Read UICC LwM2M bootstrap record.
+ *
+ * @param p_buffer    Buffer to store UICC LwM2M bootstrap record.
+ * @param buffer_size Size of the buffer in bytes.
+ *
+ * @retval  0      If success.
+ */
+int lwm2m_os_uicc_bootstrap_read(uint8_t *p_buffer, int buffer_size);
+
+/**
  * @brief get enabled system modes from modem.
  *
  * @param modes Array to store the enabled modes.
  *                  LWM2M_OS_LTE_MODE_CAT_M1  Cat-M1 (LTE-FDD)
  *                  LWM2M_OS_LTE_MODE_CAT_NB1 Cat-NB1 (NB-IoT)
  *
- * @return Number of enabled modes:
+ * @return Number of enabled modes.
  */
 size_t lwm2m_os_lte_modes_get(int32_t *modes);
 
